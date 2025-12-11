@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { type Star } from "@/lib/ziwei";
 
@@ -14,6 +15,7 @@ export interface FateCardProps {
   variant?: "focus" | "grid"; // focus = large card, grid = small card
   onClick?: () => void;
   isActive?: boolean;
+  layoutId?: string;
 }
 
 export function FateCard({
@@ -21,28 +23,55 @@ export function FateCard({
   stemBranch,
   majorStars,
   minorStars,
-  adjectiveStars = [],
   className,
   variant = "focus",
   onClick,
-  isActive
+  isActive,
+  layoutId
 }: FateCardProps) {
   // If it's the grid variant, we use a simpler layout (similar to previous implementation but styled consistently)
   if (variant === "grid") {
     return (
-      <div 
+      <motion.div 
+        layoutId={layoutId}
         onClick={onClick}
         className={cn(
-          "relative flex flex-col p-2 rounded-lg transition-all duration-300 border backdrop-blur-sm cursor-pointer min-h-[80px]",
+          "relative flex flex-col p-2 rounded-lg transition-colors duration-300 border backdrop-blur-sm cursor-pointer h-full min-h-[100px] overflow-hidden group",
           isActive 
-            ? "bg-gold-primary text-void-bg border-gold-primary font-bold shadow-[0_0_10px_rgba(229,195,101,0.4)] scale-105" 
-            : "border-white/5 bg-white/5 text-text-muted hover:bg-white/10 hover:border-white/10",
+            ? "bg-gold-primary text-void-bg border-gold-primary font-bold shadow-[0_0_10px_rgba(229,195,101,0.4)] z-10" 
+            : "border-white/10 bg-white/5 text-text-muted hover:bg-white/10 hover:border-gold-primary/50 hover:text-gold-light",
           className
         )}
       >
-        <div className="text-[12px] font-serif mb-1">{palaceName}</div>
-        <div className="text-[9px] opacity-60 font-mono">{stemBranch.charAt(1)}</div>
-      </div>
+        <div className="flex justify-between items-start mb-1">
+           <div className="text-[14px] font-serif font-bold">{palaceName}</div>
+           <div className="text-[10px] opacity-60 font-mono border border-current px-1 rounded">{stemBranch}</div>
+        </div>
+        
+        {/* Major Stars for Grid View */}
+        <div className="flex flex-wrap gap-1 mt-1">
+          {majorStars.length > 0 ? (
+            majorStars.map((star, idx) => (
+              <span key={idx} className={cn(
+                "text-[12px] font-serif",
+                star.mutagen ? "text-red-400 font-bold" : (isActive ? "text-void-bg" : "text-gold-primary")
+              )}>
+                {star.name}
+                {star.mutagen && <span className="text-[8px] align-top ml-px">{star.mutagen}</span>}
+              </span>
+            ))
+          ) : (
+            <span className="text-[10px] opacity-50">无主星</span>
+          )}
+        </div>
+
+        {/* Minor Stars - Only show top 2 or so if space permits, or just count */}
+        {minorStars.length > 0 && (
+           <div className="mt-auto pt-2 flex flex-wrap gap-1 opacity-70 text-[9px]">
+             {minorStars.slice(0, 4).map(s => s.name).join(' ')}
+           </div>
+        )}
+      </motion.div>
     );
   }
 
@@ -50,17 +79,18 @@ export function FateCard({
   const bgChar = palaceName.charAt(0);
 
   return (
-    <div 
+    <motion.div 
+      layoutId={layoutId}
       className={cn(
         "relative w-full h-[480px] rounded-[8px] p-[30px] flex flex-col overflow-hidden",
         "bg-[linear-gradient(160deg,rgba(30,30,40,0.6),rgba(10,10,12,0.8))]",
         "backdrop-blur-[20px]",
-        "border border-[rgba(255,255,255,0.08)]",
+        "border border-glass-border",
         "shadow-[0_20px_60px_rgba(0,0,0,0.6)]",
         // 3D Effects
-        "[transform:rotateX(2deg)_scale(0.98)]",
-        "transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]",
-        "hover:[transform:rotateX(0deg)_scale(1)]",
+        "transform-[rotateX(2deg)_scale(0.98)]",
+        "transition-shadow duration-500 ease-in-out",
+        "hover:transform-[rotateX(0deg)_scale(1)]",
         "hover:shadow-[0_30px_80px_rgba(0,0,0,0.8)]",
         className
       )}
@@ -73,7 +103,7 @@ export function FateCard({
       <div className="absolute bottom-[10px] right-[10px] w-[20px] h-[20px] border border-gold-primary border-l-0 border-t-0 opacity-60 transition-opacity duration-500" />
 
       {/* Background Pattern */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200px] h-[200px] rounded-full border border-dashed border-[rgba(255,255,255,0.03)] pointer-events-none select-none flex items-center justify-center">
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200px] h-[200px] rounded-full border border-dashed border-glass-surface pointer-events-none select-none flex items-center justify-center">
         <span className="font-serif text-[180px] text-[rgba(255,255,255,0.02)] leading-none mt-[-20px]">
           {bgChar}
         </span>
@@ -99,31 +129,17 @@ export function FateCard({
               majorStars.map(s => s.name).join(" ")
             ) : "无主星"}
           </div>
-          {/* Status */}
-          {majorStars.length > 0 && (
-            <div className="inline-block mt-2 text-[12px] text-[#D64545] border border-current px-[6px] py-[2px] rounded-[2px] shadow-[0_0_8px_rgba(214,69,69,0.4)]">
-              {majorStars.map(s => [s.mutagen, s.brightness].filter(Boolean).join(" · ")).join(" | ")}
-            </div>
-          )}
         </div>
 
-        {/* Minor Stars - Bottom Left */}
-        <div className="absolute left-0 bottom-0 flex flex-col gap-[12px]">
+        {/* Minor Stars - Bottom Grid */}
+        <div className="absolute bottom-[10px] left-0 w-full px-[10px] flex flex-wrap gap-2 text-[12px] text-text-muted justify-center">
           {minorStars.map((star, i) => (
-            <div key={i} className="flex items-center gap-[6px] text-[14px] text-[#ccc]">
+            <span key={i} className="px-2 py-1 bg-white/5 rounded backdrop-blur-sm border border-white/5">
               {star.name}
-              {star.mutagen && <span className="text-[10px] text-[#1E1E1E] bg-gold-primary px-[4px] py-[1px] font-bold">{star.mutagen}</span>}
-              {star.brightness && <span className="text-[10px] text-gray-500 opacity-60">({star.brightness})</span>}
-            </div>
-          ))}
-          {/* Adjective Stars */}
-          {adjectiveStars.slice(0, 2).map((star, i) => (
-             <div key={`adj-${i}`} className="flex items-center gap-[6px] text-[14px] text-[#667]">
-               {star.name}
-             </div>
+            </span>
           ))}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

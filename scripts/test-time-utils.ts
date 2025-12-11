@@ -78,10 +78,10 @@ const runTest = () => {
   // Test Case 4: Invalid Input
   try {
     console.log('Test Case 4: Invalid Input');
-    // @ts-ignore
+    // @ts-expect-error Testing runtime validation
     calculateTrueSolarTime('invalid', 120);
     console.error('❌ Test Case 4 Failed: Should throw error');
-  } catch (e) {
+  } catch {
     console.log('✅ Test Case 4 Passed (Error Caught)\n');
   }
 };

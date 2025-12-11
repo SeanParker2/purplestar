@@ -56,5 +56,6 @@ body {
 .text-gradient-gold {
   background: linear-gradient(to bottom, var(--color-gold-light), var(--color-gold-dark));
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }

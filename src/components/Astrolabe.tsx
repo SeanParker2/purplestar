@@ -37,7 +37,7 @@ export function Astrolabe({
 
       {/* Ring 2 - Middle Solid Reverse */}
       <div
-        className="absolute w-[240px] h-[240px] rounded-full border border-[rgba(255,255,255,0.08)] animate-spin-reverse"
+        className="absolute w-[240px] h-[240px] rounded-full border border-glass-border animate-spin-reverse"
       />
 
       {/* Ring 3 - Inner Dotted Gold */}

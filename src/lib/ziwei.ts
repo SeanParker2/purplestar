@@ -1,5 +1,4 @@
-// @ts-ignore
-import { Lunar, Solar } from 'lunar-javascript';
+import { Solar } from 'lunar-javascript';
 import { astro } from 'iztro';
 import { GenderName } from 'iztro/lib/i18n';
 import FunctionalAstrolabe from 'iztro/lib/astro/FunctionalAstrolabe';
@@ -53,8 +52,7 @@ export class ZiWeiCalculator {
   static getZiWeiChartByDate(
     date: Date,
     longitude: number = 120,
-    gender: Gender,
-    year?: number
+    gender: Gender
   ): ZiWeiChart {
     // 1. Calculate True Solar Time
     const trueSolarDate = calculateTrueSolarTime(date, longitude);
@@ -68,7 +66,7 @@ export class ZiWeiCalculator {
     const timeIndex = getTimeIndexFromDate(trueSolarDate) as TimeIndex;
     
     // 3. Call internal generator
-    return this.getZiWeiChart(solarDateStr, timeIndex, gender, year);
+    return this.getZiWeiChart(solarDateStr, timeIndex, gender);
   }
 
   /**
@@ -76,14 +74,12 @@ export class ZiWeiCalculator {
    * @param solarDateStr Solar Date (YYYY-MM-DD)
    * @param timeIndex Time Index (0-12)
    * @param gender Gender ('male' | 'female')
-   * @param year Optional year for flow year calculation (default: current year of the date)
    * @returns ZiWeiChart
    */
   static getZiWeiChart(
     solarDateStr: SolarDateStr,
     timeIndex: TimeIndex,
-    gender: Gender,
-    year?: number
+    gender: Gender
   ): ZiWeiChart {
     // 1. Validate Input
     if (!/^\d{4}-\d{1,2}-\d{1,2}$/.test(solarDateStr)) {
@@ -116,15 +112,9 @@ export class ZiWeiCalculator {
 
     // 5. Extract Yearly Data
     // Default to the year of the date if not provided
-    const targetYear = year || y;
+    // const targetYear = year || y; // unused for now
     
-    // Get horoscope for the target year
-    // We construct a date for the target year to get the correct flow.
-    // Use the same month/day but target year.
-    const targetDateStr = `${targetYear}-${m}-${d}`;
-    const horoscope = astrolabe.horoscope(targetDateStr, timeIndex);
-    
-    const yearlyPalacesData = this.extractYearlyPalaces(astrolabe, horoscope);
+    const yearlyPalacesData = this.extractYearlyPalaces(astrolabe);
 
     return {
       fiveElements: astrolabe.fiveElementsClass,
@@ -157,6 +147,46 @@ export class ZiWeiCalculator {
   }
 
   /**
+   * Find locations (palace indices) of specific stars
+   * 
+   * @param chart ZiWeiChart
+   * @param starNames Array of star names to find
+   * @returns Array of palace indices (0-11). If a star is not found, it is skipped (or order preserved? user said return indices array).
+   *          Implementation: Returns an array where each element corresponds to the found index of the star at the same position in input.
+   *          If a star is not found, -1 is returned for that position to maintain order mapping.
+   */
+  static findStarsLocation(chart: ZiWeiChart, starNames: string[]): number[] {
+    const locations: number[] = new Array(starNames.length).fill(-1);
+    
+    // Create a map of star name to its indices in the input array (handle duplicates if any, though unlikely for unique stars)
+    const starNameMap = new Map<string, number[]>();
+    starNames.forEach((name, idx) => {
+      if (!starNameMap.has(name)) {
+        starNameMap.set(name, []);
+      }
+      starNameMap.get(name)!.push(idx);
+    });
+
+    // Traverse all palaces (O(12 * stars_per_palace))
+    // Typically stars per palace is small (<20). So this is efficient.
+    for (let i = 0; i < chart.palaces.length; i++) {
+      const palace = chart.palaces[i];
+      const allStars = [...palace.majorStars, ...palace.minorStars, ...palace.miscStars];
+      
+      for (const star of allStars) {
+        if (starNameMap.has(star.name)) {
+          const indices = starNameMap.get(star.name)!;
+          indices.forEach(idx => {
+            locations[idx] = i;
+          });
+        }
+      }
+    }
+
+    return locations;
+  }
+
+  /**
    * Helper to extract palace data from astrolabe
    */
   private static extractPalaces(astrolabe: FunctionalAstrolabe): PalaceData[] {
@@ -183,7 +213,7 @@ export class ZiWeiCalculator {
   /**
    * Helper to extract yearly palace data
    */
-  private static extractYearlyPalaces(astrolabe: FunctionalAstrolabe, horoscope: any): PalaceData[] {
+  private static extractYearlyPalaces(astrolabe: FunctionalAstrolabe): PalaceData[] {
     const palaces: PalaceData[] = [];
 
     for (let i = 0; i < 12; i++) {

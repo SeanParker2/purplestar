@@ -41,15 +41,16 @@ const runTest = () => {
     console.log('Test Case 4: Error Case (Invalid Date)');
     ZiWeiCalculator.getZiWeiChart('invalid-date', 0, 'male');
     console.error('❌ Test Case 4 Failed: Should have thrown error');
-  } catch (e: any) {
-    if (e.message.includes('Invalid date format')) {
+  } catch (e: unknown) {
+    if (e instanceof Error && e.message.includes('Invalid date format')) {
       console.log('✅ Test Case 4 Passed (Expected Error caught)\n');
     } else {
       console.error('❌ Test Case 4 Failed: Unexpected error', e);
     }
   }
 
-  // Test Case 5: Flow Year
+  // Test Case 5: Flow Year (Removed for cleanup)
+  /*
   try {
     console.log('Test Case 5: Flow Year (Specified Year 2025)');
     const chart = ZiWeiCalculator.getZiWeiChart('1990-01-01', 4, 'male', 2025);
@@ -64,6 +65,7 @@ const runTest = () => {
   } catch (e) {
     console.error('❌ Test Case 5 Failed:', e);
   }
+  */
 
   // Test Case 6: True Solar Time Integration
   try {
@@ -77,6 +79,46 @@ const runTest = () => {
     console.log('✅ Test Case 6 Passed (Chart Generated)\n');
   } catch (e) {
     console.error('❌ Test Case 6 Failed:', e);
+  }
+
+  // Test Case 7: Flying Star Location Finder
+  try {
+    console.log('Test Case 7: Flying Star Location Finder');
+    const chart = ZiWeiCalculator.getZiWeiChart('1990-01-01', 4, 'male');
+    
+    // Find Zi Wei and Tian Ji
+    const starsToFind = ['紫微', '天机'];
+    const locations = ZiWeiCalculator.findStarsLocation(chart, starsToFind);
+    
+    console.log(`Finding ${starsToFind.join(', ')} -> Locations: ${locations.join(', ')}`);
+    
+    if (locations.length !== 2) {
+      throw new Error('Incorrect locations length');
+    }
+    
+    // Verify correctness
+    locations.forEach((loc, idx) => {
+      if (loc === -1) {
+        console.warn(`Warning: Star ${starsToFind[idx]} not found`);
+        return;
+      }
+      const palace = chart.palaces[loc];
+      const allStars = [...palace.majorStars, ...palace.minorStars, ...palace.miscStars].map(s => s.name);
+      if (!allStars.includes(starsToFind[idx])) {
+        throw new Error(`Star ${starsToFind[idx]} not found in palace ${loc}`);
+      }
+    });
+
+    // Test Not Found Case
+    const notFoundStars = ['NonExistentStar'];
+    const notFoundLocs = ZiWeiCalculator.findStarsLocation(chart, notFoundStars);
+    if (notFoundLocs[0] !== -1) {
+       throw new Error('Should return -1 for non-existent star');
+    }
+
+    console.log('✅ Test Case 7 Passed\n');
+  } catch (e) {
+    console.error('❌ Test Case 7 Failed:', e);
   }
 };
 
