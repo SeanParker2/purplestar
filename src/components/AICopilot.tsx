@@ -19,6 +19,8 @@ interface AICopilotProps {
   chart: ZiWeiChart | null;
   currentPalace: PalaceData | null;
   className?: string;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
 // --- Mock AI Service ---
@@ -33,8 +35,21 @@ const MOCK_RESPONSES = [
 
 // --- Component ---
 
-export function AICopilot({ chart, currentPalace, className }: AICopilotProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export function AICopilot({ chart, currentPalace, className, isOpen: externalIsOpen, onClose }: AICopilotProps) {
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
+
+  const isControlled = externalIsOpen !== undefined;
+  const isOpen = isControlled ? externalIsOpen : internalIsOpen;
+
+  const setIsOpen = (value: boolean) => {
+    if (isControlled) {
+      if (!value && onClose) {
+        onClose();
+      }
+    } else {
+      setInternalIsOpen(value);
+    }
+  };
   const [isTyping, setIsTyping] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [messages, setMessages] = useState<Message[]>([
