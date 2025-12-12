@@ -11,13 +11,13 @@ import {
 } from "lucide-react";
 
 // Components
-import { NebulaBackground } from "@/components/NebulaBackground";
-import { Astrolabe } from "@/components/Astrolabe";
-import { InputPortal } from "@/components/InputPortal";
-import { FateCard } from "@/components/FateCard";
-import { FullBoard } from "@/components/FullBoard";
-import { AICopilot } from "@/components/AICopilot";
-import { FlyingStarOverlay } from "@/components/FlyingStarOverlay";
+import NebulaBackground from "@/components/background/NebulaBackground";
+import Astrolabe from "@/components/visual/Astrolabe";
+import InputPortal from "@/components/InputPortal";
+import FateCard from "@/components/cards/FateCard";
+import FullBoard from "@/components/charts/FullBoard";
+import AICopilot from "@/components/ai/AICopilot";
+import FlyingStarOverlay from "@/components/effects/FlyingStarOverlay";
 
 // Logic & Utils
 import { ZiWeiCalculator, type ZiWeiChart } from "@/lib/ziwei";
@@ -174,9 +174,7 @@ export default function Home() {
             {chartMode === 'focus' && (
               <div className="absolute inset-0 pointer-events-none z-0">
                 <FlyingStarOverlay 
-                  focusedPalaceIndex={activeIndex}
-                  transformedPalaces={transformedPalaces}
-                  visible={true}
+                  paths={[]} // TODO: Implement path calculation logic
                 />
               </div>
             )}
@@ -254,7 +252,7 @@ export default function Home() {
                     <FullBoard 
                       chart={chart}
                       activeIndex={activeIndex}
-                      onPalaceClick={(idx) => {
+                      onSelect={(idx) => {
                         setActiveIndex(idx);
                         setChartMode('focus');
                       }}
@@ -278,7 +276,7 @@ export default function Home() {
             {showAI && (
               <AICopilot 
                 chart={chart}
-                currentPalace={chart.palaces[activeIndex]}
+                palaceData={chart.palaces[activeIndex]}
                 isOpen={true}
                 onClose={() => setShowAI(false)}
                 className="z-60"

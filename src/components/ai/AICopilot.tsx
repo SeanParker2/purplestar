@@ -1,0 +1,349 @@
+"use client";
+
+import React, { useState, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Send, Sparkles, Minimize2, Bot, BookOpen } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { type PalaceData, type ZiWeiChart } from "@/lib/ziwei";
+import { STAR_INTERPRETATIONS, type StarInterpretation } from "@/data/interpretations";
+
+// --- Types ---
+
+interface Message {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: number;
+}
+
+interface AICopilotProps {
+  chart: ZiWeiChart | null;
+  palaceData: PalaceData;
+  className?: string;
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+// --- Mock AI Service ---
+
+const MOCK_RESPONSES = [
+  "从星象来看，此宫位吉星高照，主星得力，预示着顺遂的发展趋势。若能把握机会，定能有所斩获。",
+  "此宫位受化忌星影响，可能会有一些波折和变动。建议稳中求进，不可操之过急，注意防范潜在的风险。",
+  "主星庙旺，且有吉星拱照，这是一个非常有力的格局。在相关领域投入精力，必有丰厚回报。",
+  "虽然主星平平，但辅星配合得当，呈现出一种平稳上升的态势。适合积累沉淀，等待时机。",
+  "此处星曜组合略显驳杂，显示出内心的纠结与外部环境的多变。建议保持冷静，理清思路再做决定。",
+];
+
+// --- Star Name Mapping ---
+const STAR_NAME_MAP: Record<string, string> = {
+  "紫微": "ZiWei",
+  "天机": "TianJi",
+  "太阳": "TaiYang",
+  "武曲": "WuQu",
+  "天同": "TianTong",
+  "廉贞": "LianZhen"
+};
+
+// --- Component ---
+
+export default function AICopilot({ chart, palaceData, className, isOpen: externalIsOpen, onClose }: AICopilotProps) {
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
+
+  const isControlled = externalIsOpen !== undefined;
+  const isOpen = isControlled ? externalIsOpen : internalIsOpen;
+
+  const setIsOpen = (value: boolean) => {
+    if (isControlled) {
+      if (!value && onClose) {
+        onClose();
+      }
+    } else {
+      setInternalIsOpen(value);
+    }
+  };
+  
+  const [isTyping, setIsTyping] = useState(false);
+  const [inputValue, setInputValue] = useState("");
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: "init",
+      role: "assistant",
+      content: "你好，我是你的紫微斗数 AI 助手。我可以为你解读命盘，分析运势。点击“分析此宫”开始吧。",
+      timestamp: Date.now(),
+    },
+  ]);
+  
+  // Knowledge Base State
+  const [interpretation, setInterpretation] = useState<StarInterpretation | null>(null);
+  const [isLoadingKnowledge, setIsLoadingKnowledge] = useState(false);
+  const [matchedStarName, setMatchedStarName] = useState<string>("");
+
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Load Knowledge Base
+  useEffect(() => {
+    if (!palaceData) return;
+
+    setIsLoadingKnowledge(true);
+    setInterpretation(null);
+    setMatchedStarName("");
+
+    // Simulate network/db latency
+    const timer = setTimeout(() => {
+      let found: StarInterpretation | null = null;
+      let starName = "";
+
+      // Only search if we have major stars
+      if (palaceData.majorStars && palaceData.majorStars.length > 0) {
+        // Try to find a match for any of the major stars
+        // Currently only supporting Life Palace mappings as per data
+        // But we will try to match regardless of palace, if the key exists (which currently is only _Life)
+        // If the user adds more data like ZiWei_Wealth, it would work if we dynamically check.
+        // For now, we assume data is primarily for Life Palace context or general star nature if we relax the key check.
+        // However, the task says "Precise Match".
+        // And data keys are "ZiWei_Life".
+        // So we strictly look for `${Star}_Life` if we are in Life palace?
+        // Or should we look for `${Star}_Life` even if we are in other palace, using it as "general interpretation"?
+        // The summary says "紫微坐命...". So it's specific to Life Palace.
+        // So we should only show it if we are in Life Palace.
+        
+        const suffix = palaceData.palaceName === "命宫" ? "Life" : null;
+        
+        if (suffix) {
+          for (const star of palaceData.majorStars) {
+            const pinyin = STAR_NAME_MAP[star.name];
+            if (pinyin) {
+              const key = `${pinyin}_${suffix}`;
+              if (STAR_INTERPRETATIONS[key]) {
+                found = STAR_INTERPRETATIONS[key];
+                starName = star.name;
+                break; // Use the first match
+              }
+            }
+          }
+        }
+      }
+
+      setInterpretation(found);
+      setMatchedStarName(starName);
+      setIsLoadingKnowledge(false);
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [palaceData]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Auto-scroll to bottom
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages, isTyping, isOpen, interpretation]);
+
+  // Focus input on open
+  useEffect(() => {
+    if (isOpen && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isOpen]);
+
+  // Handle Send Message
+  const handleSendMessage = async (text: string, isAnalysisRequest: boolean = false) => {
+    if (!text.trim()) return;
+
+    const newUserMsg: Message = {
+      id: Date.now().toString(),
+      role: "user",
+      content: text,
+      timestamp: Date.now(),
+    };
+
+    setMessages((prev) => [...prev, newUserMsg]);
+    setInputValue("");
+    setIsTyping(true);
+
+    // Build Prompt with Knowledge Base
+    let systemPrompt = "";
+    if (interpretation && matchedStarName) {
+      // Sanitize input just in case
+      const safeStarName = matchedStarName.replace(/[<>]/g, "");
+      const safeSummary = interpretation.summary.replace(/[<>]/g, "");
+      
+      systemPrompt = `用户命宫主星是${safeStarName}。系统知识库记载：[${safeSummary}]。请结合此断语和流年运势进行扩展解读。`;
+    }
+
+    // Mock AI Response with delay
+    timeoutRef.current = setTimeout(() => {
+      const randomResponse = MOCK_RESPONSES[Math.floor(Math.random() * MOCK_RESPONSES.length)];
+      
+      let responseContent = randomResponse;
+      if (isAnalysisRequest && interpretation) {
+        // In a real integration, the AI would use the systemPrompt to generate the response.
+        // Here we simulate it by mentioning the knowledge base.
+        responseContent = `[系统] 已检索到${matchedStarName}星断语，结合流年分析：\n\n${randomResponse}\n\n(参考：${interpretation.summary})`;
+      }
+
+      const newAiMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: responseContent,
+        timestamp: Date.now(),
+      };
+
+      setMessages((prev) => [...prev, newAiMsg]);
+      setIsTyping(false);
+    }, 1500);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage(inputValue);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 20, scale: 0.95 }}
+      className={cn(
+        "fixed bottom-24 right-6 w-96 h-[500px] bg-void/95 border border-gold-primary/30 rounded-xl shadow-2xl flex flex-col overflow-hidden backdrop-blur-md z-50",
+        className
+      )}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gold-primary/20 bg-gold-dark/10">
+        <div className="flex items-center gap-2 text-gold-primary">
+          <Bot size={20} />
+          <span className="font-serif font-medium tracking-wide">紫微斗数 AI 助手</span>
+        </div>
+        <button
+          onClick={() => setIsOpen(false)}
+          className="text-white/50 hover:text-white transition-colors"
+        >
+          <Minimize2 size={18} />
+        </button>
+      </div>
+
+      {/* Messages Area */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-gold-primary/20 scrollbar-track-transparent">
+        
+        {/* Featured Interpretation Card */}
+        <AnimatePresence>
+          {isLoadingKnowledge ? (
+             <motion.div
+               initial={{ opacity: 0, height: 0 }}
+               animate={{ opacity: 1, height: "auto" }}
+               exit={{ opacity: 0, height: 0 }}
+               className="mb-4"
+             >
+               <div className="bg-white/5 border border-white/10 rounded-lg p-4 space-y-2 animate-pulse">
+                 <div className="h-4 w-1/3 bg-white/10 rounded"></div>
+                 <div className="h-16 w-full bg-white/10 rounded"></div>
+               </div>
+             </motion.div>
+          ) : interpretation ? (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-gradient-to-br from-gold-dark/20 to-void border border-gold-primary/30 rounded-lg p-4 mb-4 relative overflow-hidden group"
+            >
+              <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+                <BookOpen size={48} />
+              </div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs font-bold px-2 py-0.5 rounded bg-gold-primary text-void">精选断语</span>
+                <span className="text-xs text-gold-light/70">{matchedStarName} · {palaceData.palaceName}</span>
+              </div>
+              <p className="text-sm text-gray-200 leading-relaxed font-serif">
+                {interpretation.summary}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1">
+                {interpretation.tags.map(tag => (
+                  <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full border border-white/10 text-white/60">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+
+        {messages.map((msg) => (
+          <div
+            key={msg.id}
+            className={cn(
+              "flex w-full",
+              msg.role === "user" ? "justify-end" : "justify-start"
+            )}
+          >
+            <div
+              className={cn(
+                "max-w-[85%] rounded-lg px-4 py-2.5 text-sm leading-relaxed",
+                msg.role === "user"
+                  ? "bg-gold-primary text-void font-medium"
+                  : "bg-white/10 text-gray-100 border border-white/5"
+              )}
+            >
+              {msg.content}
+            </div>
+          </div>
+        ))}
+        {isTyping && (
+          <div className="flex justify-start">
+            <div className="bg-white/10 rounded-lg px-4 py-3 flex gap-1 items-center">
+              <span className="w-1.5 h-1.5 bg-gold-primary/50 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+              <span className="w-1.5 h-1.5 bg-gold-primary/50 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+              <span className="w-1.5 h-1.5 bg-gold-primary/50 rounded-full animate-bounce"></span>
+            </div>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input Area */}
+      <div className="p-4 bg-void/50 border-t border-white/10">
+        {messages.length === 1 && (
+          <button
+            onClick={() => handleSendMessage(`请分析${palaceData.palaceName}的运势`, true)}
+            className="w-full mb-3 py-2 px-3 bg-gold-dark/20 hover:bg-gold-dark/30 border border-gold-primary/20 rounded text-sm text-gold-light transition-colors flex items-center justify-center gap-2 group"
+          >
+            <Sparkles size={14} className="group-hover:text-gold-primary" />
+            分析此宫 ({palaceData.palaceName})
+          </button>
+        )}
+        <div className="flex gap-2">
+          <input
+            ref={inputRef}
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="输入您的问题..."
+            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-gold-primary/50 transition-colors"
+          />
+          <button
+            onClick={() => handleSendMessage(inputValue)}
+            disabled={!inputValue.trim() || isTyping}
+            className="p-2 bg-gold-primary text-void rounded-lg hover:bg-gold-light disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <Send size={18} />
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
+}

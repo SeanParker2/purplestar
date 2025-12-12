@@ -2,20 +2,20 @@
 
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { FateCard } from "@/components/FateCard";
+import FateCard from "@/components/cards/FateCard";
 import { type ZiWeiChart } from "@/lib/ziwei";
 import { cn } from "@/lib/utils";
 
 interface FullBoardProps {
   chart: ZiWeiChart;
   activeIndex: number;
-  onPalaceClick: (index: number) => void;
+  onSelect: (index: number) => void;
   className?: string;
 }
 
 const BRANCH_ORDER = ["巳", "午", "未", "申", "酉", "戌", "亥", "子", "丑", "寅", "卯", "辰"];
 
-export function FullBoard({ chart, activeIndex, onPalaceClick, className }: FullBoardProps) {
+export default function FullBoard({ chart, activeIndex, onSelect, className }: FullBoardProps) {
   const [layoutMode, setLayoutMode] = useState<'modern' | 'traditional'>('modern');
 
   // Helper to find palace by branch char
@@ -52,6 +52,7 @@ export function FullBoard({ chart, activeIndex, onPalaceClick, className }: Full
             {chart.palaces.map((palace, idx) => (
               <FateCard
                 key={palace.palaceName}
+                id={`palace-${idx}`}
                 layoutId={`palace-${idx}`}
                 variant="grid"
                 palaceName={palace.palaceName}
@@ -60,7 +61,7 @@ export function FullBoard({ chart, activeIndex, onPalaceClick, className }: Full
                 minorStars={palace.minorStars}
                 adjectiveStars={palace.miscStars}
                 isActive={idx === activeIndex}
-                onClick={() => onPalaceClick(idx)}
+                onClick={() => onSelect(idx)}
               />
             ))}
           </div>
@@ -85,11 +86,6 @@ export function FullBoard({ chart, activeIndex, onPalaceClick, className }: Full
               
               const idx = getPalaceIndex(palace.palaceName);
               
-              // Map branch to grid position manually since we can't use named areas easily with dynamic content order without wrapper
-              // Actually we can just place them in correct order if we iterate 0-15 positions
-              // But iterating branches is safer to find the palace.
-              
-              // We need to assign grid-area or col/row classes based on branch
               let gridClass = "";
               switch(branch) {
                 case "巳": gridClass = "col-start-1 row-start-1"; break;
@@ -112,6 +108,7 @@ export function FullBoard({ chart, activeIndex, onPalaceClick, className }: Full
               return (
                 <div key={branch} className={gridClass}>
                   <FateCard
+                    id={`palace-${idx}`}
                     layoutId={`palace-${idx}`}
                     variant="grid"
                     palaceName={palace.palaceName}
@@ -120,7 +117,7 @@ export function FullBoard({ chart, activeIndex, onPalaceClick, className }: Full
                     minorStars={palace.minorStars}
                     adjectiveStars={palace.miscStars}
                     isActive={idx === activeIndex}
-                    onClick={() => onPalaceClick(idx)}
+                    onClick={() => onSelect(idx)}
                     className="h-full"
                   />
                 </div>

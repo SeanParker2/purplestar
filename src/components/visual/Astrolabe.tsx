@@ -9,7 +9,7 @@ interface AstrolabeProps {
   className?: string;
 }
 
-export function Astrolabe({ 
+export default function Astrolabe({ 
   yearStr = "乙巳年", 
   termStr = "大雪初候",
   className 

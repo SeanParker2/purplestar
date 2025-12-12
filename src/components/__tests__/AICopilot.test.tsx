@@ -1,7 +1,7 @@
 import React from 'react';
 import '@testing-library/jest-dom';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { AICopilot } from '../AICopilot';
+import { AICopilot } from '../ai/AICopilot';
 import { ZiWeiChart, PalaceData } from '@/lib/ziwei';
 
 // Mock data

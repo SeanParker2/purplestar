@@ -2,7 +2,7 @@
 
 import React from "react";
 
-export function NebulaBackground() {
+export default function NebulaBackground() {
   return (
     <div className="fixed inset-0 -z-50 overflow-hidden bg-void">
       {/* Deep Space Background */}

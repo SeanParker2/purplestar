@@ -18,6 +18,8 @@ export interface Star {
 
 export interface PalaceData {
   palaceName: string;
+  stem: string;
+  branch: string;
   heavenlyEarthly: string;
   majorStars: Star[];
   minorStars: Star[];
@@ -199,6 +201,8 @@ export class ZiWeiCalculator {
 
       palaces.push({
         palaceName: p.name,
+        stem: p.heavenlyStem,
+        branch: p.earthlyBranch,
         heavenlyEarthly: p.heavenlyStem + p.earthlyBranch,
         majorStars: p.majorStars.map(s => ({ name: s.name, mutagen: s.mutagen, brightness: s.brightness })),
         minorStars: p.minorStars.map(s => ({ name: s.name, mutagen: s.mutagen, brightness: s.brightness })),
@@ -226,6 +230,8 @@ export class ZiWeiCalculator {
       
       palaces.push({
         palaceName: p.name,
+        stem: p.heavenlyStem,
+        branch: p.earthlyBranch,
         heavenlyEarthly: p.heavenlyStem + p.earthlyBranch,
         majorStars: p.majorStars.map(s => ({ name: s.name, mutagen: s.mutagen, brightness: s.brightness })),
         minorStars: p.minorStars.map(s => ({ name: s.name, mutagen: s.mutagen, brightness: s.brightness })),

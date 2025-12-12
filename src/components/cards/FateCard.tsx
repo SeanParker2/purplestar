@@ -16,9 +16,10 @@ export interface FateCardProps {
   onClick?: () => void;
   isActive?: boolean;
   layoutId?: string;
+  id?: string;
 }
 
-export function FateCard({
+export default function FateCard({
   palaceName,
   stemBranch,
   majorStars,
@@ -27,12 +28,14 @@ export function FateCard({
   variant = "focus",
   onClick,
   isActive,
-  layoutId
+  layoutId,
+  id
 }: FateCardProps) {
   // If it's the grid variant, we use a simpler layout (similar to previous implementation but styled consistently)
   if (variant === "grid") {
     return (
       <motion.div 
+        id={id}
         layoutId={layoutId}
         onClick={onClick}
         className={cn(
@@ -80,6 +83,7 @@ export function FateCard({
 
   return (
     <motion.div 
+      id={id}
       layoutId={layoutId}
       className={cn(
         "relative w-full h-[480px] rounded-[8px] p-[30px] flex flex-col overflow-hidden",

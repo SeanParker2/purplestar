@@ -8,7 +8,7 @@ interface InputPortalProps {
   onSubmit: (data: { date: Date; longitude: number; gender: "male" | "female" }) => void;
 }
 
-export function InputPortal({ onSubmit }: InputPortalProps) {
+export default function InputPortal({ onSubmit }: InputPortalProps) {
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [longitude, setLongitude] = useState("120.0"); // Keep as string for input handling
