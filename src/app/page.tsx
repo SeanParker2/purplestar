@@ -30,6 +30,15 @@ import { cn } from "@/lib/utils";
 type ViewMode = 'home' | 'input' | 'chart';
 type ChartMode = 'focus' | 'grid';
 
+const OPPOSITE_MAP: Record<string, string> = {
+  "命宫": "迁移宫", "迁移宫": "命宫",
+  "兄弟宫": "交友宫", "交友宫": "兄弟宫",
+  "夫妻宫": "官禄宫", "官禄宫": "夫妻宫",
+  "子女宫": "田宅宫", "田宅宫": "子女宫",
+  "财帛宫": "福德宫", "福德宫": "财帛宫",
+  "疾厄宫": "父母宫", "父母宫": "疾厄宫"
+};
+
 // --- Main Page Component ---
 
 export default function Home() {
@@ -276,6 +285,9 @@ export default function Home() {
                         stemBranch={chart.palaces[activeIndex].heavenlyEarthly}
                         variant="focus"
                         layoutId={`palace-${activeIndex}`}
+                        oppositeMajorStars={
+                          chart.palaces.find(p => p.palaceName === OPPOSITE_MAP[chart.palaces[activeIndex].palaceName])?.majorStars
+                        }
                       />
                     </div>
 

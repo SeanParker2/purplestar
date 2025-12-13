@@ -12,6 +12,7 @@ export interface FateCardProps {
   majorStars: Star[]; 
   minorStars: Star[];
   adjectiveStars?: Star[]; // Added to match HTML structure better if available
+  oppositeMajorStars?: Star[]; // 对宫主星 (用于借宫安星)
   className?: string;
   variant?: "focus" | "grid"; // focus = large card, grid = small card
   onClick?: () => void;
@@ -27,6 +28,7 @@ export default function FateCard({
   majorStars,
   minorStars,
   adjectiveStars,
+  oppositeMajorStars,
   className,
   variant = "focus",
   onClick,
@@ -35,10 +37,14 @@ export default function FateCard({
   id,
   onAskAI
 }: FateCardProps) {
+  // Logic: Handle Borrowed Stars (借宫安星)
+  const isBorrowed = majorStars.length === 0 && !!oppositeMajorStars && oppositeMajorStars.length > 0;
+  const effectiveMajorStars = isBorrowed ? oppositeMajorStars! : majorStars;
+
   // Logic: Find interpretation
   const { main, patterns, transformations, minors } = React.useMemo(() => 
-    getPalaceInterpretations(palaceName, majorStars, minorStars, adjectiveStars, stemBranch), 
-    [palaceName, majorStars, minorStars, adjectiveStars, stemBranch]
+    getPalaceInterpretations(palaceName, effectiveMajorStars, minorStars, adjectiveStars, stemBranch, isBorrowed), 
+    [palaceName, effectiveMajorStars, minorStars, adjectiveStars, stemBranch, isBorrowed]
   );
 
   // If it's the grid variant, we use a simpler layout (similar to previous implementation but styled consistently)
@@ -63,12 +69,14 @@ export default function FateCard({
         
         {/* Major Stars for Grid View */}
         <div className="flex flex-wrap gap-1 mt-1">
-          {majorStars.length > 0 ? (
-            majorStars.map((star, idx) => (
+          {effectiveMajorStars.length > 0 ? (
+            effectiveMajorStars.map((star, idx) => (
               <span key={idx} className={cn(
                 "text-[12px] font-serif",
-                star.mutagen ? "text-red-400 font-bold" : (isActive ? "text-void-bg" : "text-gold-primary")
+                star.mutagen ? "text-red-400 font-bold" : (isActive ? "text-void-bg" : "text-gold-primary"),
+                isBorrowed && "opacity-80"
               )}>
+                {isBorrowed && <span className="scale-75 inline-block mr-0.5 opacity-60">(借)</span>}
                 {star.name}
                 {star.mutagen && <span className="text-[8px] align-top ml-px">{star.mutagen}</span>}
               </span>
@@ -137,11 +145,12 @@ export default function FateCard({
         <div className="flex-1 flex flex-col items-center justify-start pt-8 px-6 overflow-hidden">
           {/* Major Star - Centered */}
           <div 
-            className="font-serif text-[36px] font-bold text-text-main tracking-[4px] mb-4 shrink-0"
+            className="font-serif text-[36px] font-bold text-text-main tracking-[4px] mb-4 shrink-0 flex items-center gap-2"
             style={{ textShadow: "0 4px 20px rgba(0,0,0,0.8)" }}
           >
-            {majorStars.length > 0 ? (
-              majorStars.map(s => s.name).join(" ")
+            {isBorrowed && <span className="text-lg opacity-60 font-normal border border-white/20 rounded px-2 py-0.5 transform -translate-y-1">借</span>}
+            {effectiveMajorStars.length > 0 ? (
+              effectiveMajorStars.map(s => s.name).join(" ")
             ) : "无主星"}
           </div>
 

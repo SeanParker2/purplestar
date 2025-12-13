@@ -15,6 +15,15 @@ interface FullBoardProps {
 
 const BRANCH_ORDER = ["巳", "午", "未", "申", "酉", "戌", "亥", "子", "丑", "寅", "卯", "辰"];
 
+const OPPOSITE_MAP: Record<string, string> = {
+  "命宫": "迁移宫", "迁移宫": "命宫",
+  "兄弟宫": "交友宫", "交友宫": "兄弟宫",
+  "夫妻宫": "官禄宫", "官禄宫": "夫妻宫",
+  "子女宫": "田宅宫", "田宅宫": "子女宫",
+  "财帛宫": "福德宫", "福德宫": "财帛宫",
+  "疾厄宫": "父母宫", "父母宫": "疾厄宫"
+};
+
 export default function FullBoard({ chart, activeIndex, onSelect, className }: FullBoardProps) {
   const [layoutMode, setLayoutMode] = useState<'modern' | 'traditional'>('modern');
 
@@ -26,6 +35,13 @@ export default function FullBoard({ chart, activeIndex, onSelect, className }: F
   // Helper to get index in the original array
   const getPalaceIndex = (palaceName: string) => {
     return chart.palaces.findIndex(p => p.palaceName === palaceName);
+  };
+
+  // Helper to get opposite palace stars
+  const getOppositeStars = (palaceName: string) => {
+    const targetName = OPPOSITE_MAP[palaceName];
+    if (!targetName) return [];
+    return chart.palaces.find(p => p.palaceName === targetName)?.majorStars || [];
   };
 
   return (
@@ -60,6 +76,7 @@ export default function FullBoard({ chart, activeIndex, onSelect, className }: F
                 majorStars={palace.majorStars}
                 minorStars={palace.minorStars}
                 adjectiveStars={palace.miscStars}
+                oppositeMajorStars={getOppositeStars(palace.palaceName)}
                 isActive={idx === activeIndex}
                 onClick={() => onSelect(idx)}
               />
@@ -114,9 +131,10 @@ export default function FullBoard({ chart, activeIndex, onSelect, className }: F
                     palaceName={palace.palaceName}
                     stemBranch={palace.heavenlyEarthly}
                     majorStars={palace.majorStars}
-                    minorStars={palace.minorStars}
-                    adjectiveStars={palace.miscStars}
-                    isActive={idx === activeIndex}
+                minorStars={palace.minorStars}
+                adjectiveStars={palace.miscStars}
+                oppositeMajorStars={getOppositeStars(palace.palaceName)}
+                isActive={idx === activeIndex}
                     onClick={() => onSelect(idx)}
                     className="h-full"
                   />

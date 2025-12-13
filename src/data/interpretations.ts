@@ -1889,3 +1889,26 @@ export const STAR_INTERPRETATIONS: StarInterpretation[] = [
     tags: ["#富足", "#稳重", "#理财", "#保守"]
   }
 ];
+
+export const AUXILIARY_REST_INTERPRETATIONS: StarInterpretation[] = [
+  // ==================== 迁移宫辅星 (Travel Auxiliary) ====================
+  // 侧重：出门是否顺遂、意外、贵人
+
+  { star: "擎羊", palace: "迁移宫", summary: "出门受阻，意外刑伤", detail: "主在外人际关系紧张，易与人发生冲突。需防交通意外或血光之灾。虽有开创力，但阻力极大。", tags: ["#意外", "#冲突"] },
+  { star: "陀罗", palace: "迁移宫", summary: "拖延滞留，水土不服", detail: "主出门遇事多磨，行程易被耽误。在外地易有纠纷缠身，或水土不服。不宜频繁变动。", tags: ["#拖延", "#纠纷"] },
+  { star: "火星", palace: "迁移宫", summary: "奔波劳碌，突发变故", detail: "主在外奔波辛苦，心神不宁。易遇突发状况，如班机延误、突发争执。利于“动”中求财。", tags: ["#奔波", "#突发"] },
+  { star: "左辅", palace: "迁移宫", summary: "出门见贵，多方助力", detail: "主在外得贵人扶持，朋友多。办事顺利，有人帮衬。适合去外地发展或移民。", tags: ["#贵人", "#助力"] },
+  { star: "文昌", palace: "迁移宫", summary: "在外扬名，文书顺利", detail: "主在外地有声名，利于求学、深造或从事文化交流。但在外也会比较讲究排场。", tags: ["#名声", "#求学"] },
+  { star: "地空", palace: "迁移宫", summary: "前路迷茫，意外破耗", detail: "主在外易迷路，或计划落空。常有莫名其妙的财物损失。适合独自旅行寻找灵感。", tags: ["#迷茫", "#破财"] },
+
+  // ==================== 兄弟宫辅星 (Siblings/Partners Auxiliary) ====================
+  // 侧重：合作吉凶、兄弟助力
+
+  { star: "擎羊", palace: "兄弟宫", summary: "争执刑克，反目成仇", detail: "主兄弟间多争吵，甚至大打出手。朋友或合作伙伴易背叛，不可有金钱往来。", tags: ["#反目", "#争执"] },
+  { star: "火星", palace: "兄弟宫", summary: "关系火爆，聚散匆匆", detail: "主与兄弟朋友脾气都大，一言不合就冲突，但好得快分得也快。合作不长久。", tags: ["#火爆", "#短暂"] },
+  { star: "左辅", palace: "兄弟宫", summary: "兄弟众多，得力助手", detail: "主兄弟姐妹多，或朋友下属得力。在事业上能获得实质性的帮助和资金支持。", tags: ["#得力", "#众多"] },
+  { star: "文曲", palace: "兄弟宫", summary: "感情丰富，才艺之友", detail: "主兄弟朋友多才多艺，感情融洽。但若化忌，需防被朋友的甜言蜜语诈骗。", tags: ["#才艺", "#融洽"] },
+  { star: "地劫", palace: "兄弟宫", summary: "因友破财，受累亏损", detail: "主被兄弟朋友拖累，借钱不还，或合伙被坑。朋友越多，破耗越大。宜独立经营。", tags: ["#破财", "#拖累"] }
+];
+
+STAR_INTERPRETATIONS.push(...AUXILIARY_REST_INTERPRETATIONS);

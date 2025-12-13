@@ -16,7 +16,8 @@ export function getPalaceInterpretations(
   majorStars: Star[],
   minorStars: Star[],
   adjectiveStars: Star[] = [],
-  stemBranch: string = "" // 需要传入干支，例如 "甲子"，用于判断地支方位
+  stemBranch: string = "", // 需要传入干支，例如 "甲子"，用于判断地支方位
+  isBorrowed: boolean = false // 是否借星 (空宫借对宫)
 ): PalaceInterpretations {
   const result: PalaceInterpretations = {
     main: [],
@@ -83,7 +84,16 @@ export function getPalaceInterpretations(
         item => item.star === combo && item.palace === palaceName
       );
       if (dualInterp) {
-        result.main.push(dualInterp);
+        // 如果是借星，添加标记
+        if (isBorrowed) {
+          result.main.push({
+            ...dualInterp,
+            summary: `(借星) ${dualInterp.summary}`,
+            tags: [...dualInterp.tags, "#借星"]
+          });
+        } else {
+          result.main.push(dualInterp);
+        }
         foundDual = true;
         break;
       }
@@ -95,7 +105,18 @@ export function getPalaceInterpretations(
       const interp = STAR_INTERPRETATIONS.find(
         item => item.star === star.name && item.palace === palaceName
       );
-      if (interp) result.main.push(interp);
+      if (interp) {
+        // 如果是借星，添加标记
+        if (isBorrowed) {
+          result.main.push({
+            ...interp,
+            summary: `(借星) ${interp.summary}`,
+            tags: [...interp.tags, "#借星"]
+          });
+        } else {
+          result.main.push(interp);
+        }
+      }
     });
   }
 
@@ -119,6 +140,19 @@ export function getPalaceInterpretations(
     );
     if (interp) result.minors.push(interp);
   });
+
+  // ==================== Step D: 兜底逻辑 (Fallback) ====================
+  // 如果 Main, Transformations, Minors 全都是空的（说明是纯空宫或只有小星）
+  if (result.main.length === 0 && result.transformations.length === 0 && result.minors.length === 0) {
+    // 添加一个兜底解释
+    result.minors.push({
+      star: "平稳",
+      palace: palaceName,
+      summary: "星曜平淡，无风无浪",
+      detail: `此宫位内无强力主星或吉煞激荡，主该方面运势平稳，受对宫及三方四正影响较大。宜静守，顺其自然。`,
+      tags: ["#平稳", "#静守"]
+    });
+  }
 
   return result;
 }
