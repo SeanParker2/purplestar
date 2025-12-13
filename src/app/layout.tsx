@@ -8,33 +8,33 @@ import "./globals.css";
 const SITE_URL = "https://ziyuan.app";
 
 export const metadata: Metadata = {
-  title: "紫垣 (The Enclosure) - 专业紫微斗数排盘与智能解盘系统",
-  description: "基于真太阳时的专业紫微斗数排盘工具。融合传统易学与现代 AI 技术，提供精准的命盘推演、流年运势分析及个性化运程指导。弘扬东方星象美学。",
-  keywords: ["紫微斗数", "在线排盘", "算命", "运势", "流年", "AI解盘", "真太阳时", "传统文化"],
+  title: "PurpleStar - Professional Zi Wei Dou Shu Astrolabe",
+  description: "PurpleStar is a professional Zi Wei Dou Shu astrolabe tool based on true solar time. Integrating traditional I-Ching wisdom with modern AI technology, it provides precise chart calculations, yearly fortune analysis, and personalized guidance.",
+  keywords: ["PurpleStar", "Zi Wei Dou Shu", "Astrolabe", "Fortune Telling", "AI", "True Solar Time", "Chinese Astrology"],
   manifest: "/manifest.json",
   alternates: {
     canonical: SITE_URL,
   },
   openGraph: {
-    title: "紫垣 (The Enclosure) - 专业紫微斗数排盘与智能解盘系统",
-    description: "基于真太阳时的专业紫微斗数排盘工具。融合传统易学与现代 AI 技术，提供精准的命盘推演、流年运势分析及个性化运程指导。",
+    title: "PurpleStar - Professional Zi Wei Dou Shu Astrolabe",
+    description: "PurpleStar is a professional Zi Wei Dou Shu astrolabe tool based on true solar time. Integrating traditional I-Ching wisdom with modern AI technology.",
     type: "website",
     locale: "zh_CN",
     url: SITE_URL,
-    siteName: "紫垣 The Enclosure",
+    siteName: "PurpleStar",
     images: [
       {
         url: `${SITE_URL}/og-image.jpg`, // TODO: Please add og-image.jpg to your public folder
         width: 1200,
         height: 630,
-        alt: "紫垣 - 专业紫微斗数排盘",
+        alt: "PurpleStar - Professional Zi Wei Dou Shu Astrolabe",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "紫垣 (The Enclosure) - 专业紫微斗数排盘与智能解盘系统",
-    description: "基于真太阳时的专业紫微斗数排盘工具。融合传统易学与现代 AI 技术，提供精准的命盘推演、流年运势分析及个性化运程指导。",
+    title: "PurpleStar - Professional Zi Wei Dou Shu Astrolabe",
+    description: "PurpleStar is a professional Zi Wei Dou Shu astrolabe tool based on true solar time. Integrating traditional I-Ching wisdom with modern AI technology.",
     images: [`${SITE_URL}/og-image.jpg`],
   },
 };
@@ -55,7 +55,7 @@ export default function RootLayout({
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    "name": "紫垣 (The Enclosure)",
+    "name": "PurpleStar",
     "applicationCategory": "LifestyleApplication",
     "operatingSystem": "Browser",
     "description": "基于真太阳时的专业紫微斗数排盘工具，融合传统易学与现代 AI 技术。",

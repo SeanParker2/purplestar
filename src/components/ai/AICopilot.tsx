@@ -410,7 +410,7 @@ export default function AICopilot({ chart, palaceData, className, isOpen: extern
           <div className="flex items-center justify-between px-4 py-3 border-b border-gold-primary/20 bg-gold-dark/5">
             <div className="flex items-center gap-2 text-gold-primary">
               <Bot size={20} />
-              <span className="font-serif font-medium tracking-wide">紫微斗数 AI</span>
+              <span className="font-serif font-medium tracking-wide">PurpleStar AI 问策</span>
             </div>
             <div className="flex items-center gap-1">
               <button

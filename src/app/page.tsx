@@ -238,7 +238,7 @@ export default function Home() {
             {/* Header: User Info */}
             <header className="flex justify-between items-center px-6 pt-6 pb-2 z-20">
               <div>
-                <h1 className="text-gold-primary font-serif text-xl tracking-wider">紫微斗数</h1>
+                <h1 className="text-gold-primary font-serif text-xl tracking-wider">PurpleStar</h1>
                 <p className="text-xs text-text-muted mt-1">
                   {userData?.name || "命主"} · {chart.fiveElements}局 · {chart.lifeOwner}
                 </p>

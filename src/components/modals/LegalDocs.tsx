@@ -80,7 +80,7 @@ export default function LegalDocs({ isOpen, onClose }: LegalDocsProps) {
                     <section>
                       <h3 className="text-gold-primary font-serif text-lg mb-3">1. 服务说明</h3>
                       <p>
-                        欢迎使用紫垣（The Enclosure）系统。本系统结合传统易学理论与现代人工智能技术，为您提供紫微斗数排盘及辅助解读服务。
+                        欢迎使用 PurpleStar 系统。本系统结合传统易学理论与现代人工智能技术，为您提供紫微斗数排盘及辅助解读服务。
                       </p>
                     </section>
 
@@ -103,7 +103,7 @@ export default function LegalDocs({ isOpen, onClose }: LegalDocsProps) {
                     <section>
                       <h3 className="text-gold-primary font-serif text-lg mb-3">3. 知识产权</h3>
                       <p>
-                        本系统产生的所有排盘数据、UI 设计、算法逻辑及生成式文本内容，其知识产权归紫垣团队所有。未经授权，不得进行商业转载或反向工程。
+                        本系统产生的所有排盘数据、UI 设计、算法逻辑及生成式文本内容，其知识产权归 PurpleStar 团队所有。未经授权，不得进行商业转载或反向工程。
                       </p>
                     </section>
                   </>
