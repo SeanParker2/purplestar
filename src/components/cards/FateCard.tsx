@@ -4,7 +4,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { type Star } from "@/lib/ziwei";
-import { STAR_INTERPRETATIONS } from "@/data/interpretations";
+import { getPalaceInterpretations } from "@/lib/interpretation-utils";
 
 export interface FateCardProps {
   palaceName: string; // e.g. "命宫"
@@ -26,6 +26,7 @@ export default function FateCard({
   stemBranch,
   majorStars,
   minorStars,
+  adjectiveStars,
   className,
   variant = "focus",
   onClick,
@@ -35,15 +36,10 @@ export default function FateCard({
   onAskAI
 }: FateCardProps) {
   // Logic: Find interpretation
-  const interpretation = React.useMemo(() => {
-    if (majorStars.length === 0) return null;
-    
-    // Try to find interpretation for the first major star
-    const starName = majorStars[0].name;
-    return STAR_INTERPRETATIONS.find(
-      item => item.star === starName && item.palace === palaceName
-    );
-  }, [majorStars, palaceName]);
+  const { main, transformations, minors } = React.useMemo(() => 
+    getPalaceInterpretations(palaceName, majorStars, minorStars, adjectiveStars), 
+    [palaceName, majorStars, minorStars, adjectiveStars]
+  );
 
   // If it's the grid variant, we use a simpler layout (similar to previous implementation but styled consistently)
   if (variant === "grid") {
@@ -150,41 +146,96 @@ export default function FateCard({
           </div>
 
           {/* Interpretation Section */}
-          <div className="w-full flex flex-col items-center gap-4 overflow-y-auto [&::-webkit-scrollbar]:hidden pb-4">
-            {interpretation ? (
+          <div className="w-full flex flex-col items-center gap-6 overflow-y-auto [&::-webkit-scrollbar]:hidden pb-4">
+            {(main.length > 0 || transformations.length > 0 || minors.length > 0) ? (
               <div 
-                className="flex flex-col items-center gap-3 w-full cursor-pointer group"
+                className="flex flex-col items-center gap-6 w-full cursor-pointer group"
                 onClick={(e) => {
                   e.stopPropagation();
                   if (onAskAI) {
-                     onAskAI(`请详细解释关于${palaceName}的这段描述：“${interpretation.summary}”。\n详细内容：${interpretation.detail}`);
+                     // 构建综合上下文
+                     const context = [
+                        `【主星格局】${main.map(i => `${i.summary}。${i.detail}`).join(" ")}`,
+                        transformations.length > 0 ? `【四化变数】${transformations.map(i => `${i.star}${i.palace.replace("化", "")}: ${i.summary}`).join("；")}` : "",
+                        minors.length > 0 ? `【辅星影响】${minors.map(i => `${i.star}: ${i.summary}`).join("；")}` : ""
+                     ].filter(Boolean).join("\n\n");
+                     
+                     onAskAI(`请综合分析${palaceName}的情况：\n\n${context}`);
                   }
                 }}
               >
-                 {/* Summary */}
-                 <div className="relative px-6 py-2 text-center">
-                    <span className="absolute top-0 left-0 text-gold-primary/40 font-serif text-2xl leading-none">❝</span>
-                    <p className="font-serif text-lg italic text-gold-primary group-hover:text-gold-light transition-colors duration-300">
-                      {interpretation.summary}
-                    </p>
-                    <span className="absolute bottom-0 right-0 text-gold-primary/40 font-serif text-2xl leading-none">❞</span>
-                 </div>
+                 {/* Section 1: 核心格局 (Main) */}
+                 {main.map((item, idx) => (
+                   <div key={`main-${idx}`} className="flex flex-col items-center gap-3 w-full">
+                     <div className="relative px-6 py-2 text-center">
+                        <span className="absolute top-0 left-0 text-gold-primary/40 font-serif text-2xl leading-none">❝</span>
+                        <p className="font-serif text-lg italic text-gold-primary group-hover:text-gold-light transition-colors duration-300">
+                          {item.summary}
+                        </p>
+                        <span className="absolute bottom-0 right-0 text-gold-primary/40 font-serif text-2xl leading-none">❞</span>
+                     </div>
+                     <p className="text-text-muted text-sm leading-relaxed text-justify font-sans opacity-90 px-1 group-hover:text-white/90 transition-colors duration-300">
+                        {item.detail}
+                     </p>
+                     <div className="flex flex-wrap justify-center gap-2 mt-1">
+                        {item.tags.map((tag: string) => (
+                            <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-gold-light/60 group-hover:border-gold-primary/30 transition-colors">
+                                {tag}
+                            </span>
+                        ))}
+                     </div>
+                   </div>
+                 ))}
 
-                 <div className="w-16 h-px bg-liner-to-r from-transparent via-gold-primary/30 to-transparent shrink-0" />
+                 {/* Section 2: 天机变数 (Transformations) */}
+                 {transformations.length > 0 && (
+                   <div className="w-full flex flex-col gap-2 mt-2">
+                     {transformations.map((item, idx) => {
+                       const mutagen = item.palace.replace("化", ""); // "化禄" -> "禄"
+                       const isGood = ["禄", "权", "科"].includes(mutagen);
+                       return (
+                         <div key={`trans-${idx}`} className={cn(
+                           "relative p-3 rounded-lg border-l-2 flex flex-col gap-1",
+                           isGood ? "bg-red-500/10 border-red-400" : "bg-blue-500/10 border-blue-400"
+                         )}>
+                            <div className="flex items-center gap-2">
+                               <span className={cn(
+                                 "text-xs font-bold px-1.5 py-0.5 rounded",
+                                 isGood ? "bg-red-500 text-white" : "bg-blue-500 text-white"
+                               )}>
+                                 {item.star}化{mutagen}
+                               </span>
+                               <span className={cn(
+                                 "text-sm font-bold",
+                                 isGood ? "text-red-200" : "text-blue-200"
+                               )}>
+                                 {item.summary}
+                               </span>
+                            </div>
+                            <p className="text-xs opacity-80 leading-relaxed pl-1">
+                              {item.detail}
+                            </p>
+                         </div>
+                       );
+                     })}
+                   </div>
+                 )}
 
-                 {/* Detail */}
-                 <p className="text-text-muted text-sm leading-relaxed text-justify font-sans opacity-90 px-1 group-hover:text-white/90 transition-colors duration-300">
-                    {interpretation.detail}
-                 </p>
+                 {/* Section 3: 辅星细节 (Minors) */}
+                 {minors.length > 0 && (
+                   <div className="w-full flex flex-col gap-1 mt-2 pt-4 border-t border-white/10">
+                      <h4 className="text-[10px] uppercase tracking-widest text-white/40 text-center mb-2">辅星影响</h4>
+                      <div className="grid grid-cols-1 gap-2">
+                        {minors.map((item, idx) => (
+                          <div key={`minor-${idx}`} className="flex items-baseline gap-2 text-xs text-white/60">
+                            <span className="text-gold-light/80 font-bold shrink-0">[{item.star}]</span>
+                            <span className="opacity-80">{item.summary}</span>
+                          </div>
+                        ))}
+                      </div>
+                   </div>
+                 )}
 
-                 {/* Tags */}
-                 <div className="flex flex-wrap justify-center gap-2 mt-1">
-                    {interpretation.tags.map(tag => (
-                        <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-gold-light/60 group-hover:border-gold-primary/30 transition-colors">
-                            {tag}
-                        </span>
-                    ))}
-                 </div>
               </div>
             ) : (
               <div className="text-white/30 text-sm italic mt-8 flex flex-col items-center gap-2">
