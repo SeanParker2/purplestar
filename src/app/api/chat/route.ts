@@ -26,6 +26,70 @@ const SYSTEM_PROMPT_TEMPLATE = `
 请根据以上命盘信息和用户的提问，进行专业的紫微斗数分析。
 `;
 
+// Helper to simplify chart for AI context to save tokens and improve focus
+function simplifyChartForAI(chart: any): string {
+  if (!chart) return "无命盘数据";
+
+  try {
+    const parts: string[] = [];
+
+    // 1. Basic Info
+    parts.push(`【基本信息】`);
+    parts.push(`局数: ${chart.fiveElements || '未知'}`);
+    parts.push(`命主: ${chart.lifeOwner || '未知'}`);
+    parts.push(`身主: ${chart.bodyOwner || '未知'}`);
+    if (chart.gender) parts.push(`性别: ${chart.gender === 'male' ? '男' : '女'}`);
+    if (chart.solarDateStr) parts.push(`阳历: ${chart.solarDateStr}`);
+
+    // 2. Palaces
+    parts.push(`\n【十二宫位分布】`);
+    if (Array.isArray(chart.palaces)) {
+      chart.palaces.forEach((p: any) => {
+        // Palace Header: Name + Stem/Branch
+        let palaceStr = `${p.palaceName}(${p.heavenlyEarthly}): `;
+
+        // Major Stars with Brightness and Mutagen
+        const majorStars = Array.isArray(p.majorStars) 
+          ? p.majorStars.map((s: any) => {
+              let sStr = s.name;
+              if (s.mutagen) sStr += `(${s.mutagen})`;
+              if (s.brightness) sStr += `[${s.brightness}]`;
+              return sStr;
+            }).join(", ")
+          : "";
+        
+        if (majorStars) palaceStr += `${majorStars}`;
+        else palaceStr += "无主星";
+
+        // Minor Stars (Name only to save space)
+        const minorStars = Array.isArray(p.minorStars)
+          ? p.minorStars.map((s: any) => s.name).join(", ")
+          : "";
+        
+        if (minorStars) palaceStr += `, ${minorStars}`;
+
+        parts.push(palaceStr);
+      });
+    }
+
+    // 3. Yearly Info (Brief)
+    if (Array.isArray(chart.yearly) && chart.yearly.length > 0) {
+      parts.push(`\n【流年信息】`);
+      // Find the Yearly Life Palace (Liu Nian Ming Gong)
+      const yearlyLifePalace = chart.yearly.find((p: any) => p.palaceName === '命宫');
+      if (yearlyLifePalace) {
+         parts.push(`流年命宫在: ${yearlyLifePalace.heavenlyEarthly}`);
+      }
+      // Can add more yearly highlights if needed, but keeping it minimal for now
+    }
+
+    return parts.join("\n");
+  } catch (e) {
+    console.error("Error simplifying chart:", e);
+    return "命盘数据解析失败";
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     // 1. Validate Environment Variables
@@ -59,11 +123,12 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Construct System Prompt
-    // Format chart context into a readable string
-    const contextString = JSON.stringify(chartContext, null, 2);
+    // Optimize chart context using simplifyChartForAI
+    const simplifiedContext = simplifyChartForAI(chartContext);
+    
     const systemContent = SYSTEM_PROMPT_TEMPLATE.replace(
       '{{CHART_CONTEXT}}',
-      contextString
+      simplifiedContext
     );
 
     const apiMessages = [

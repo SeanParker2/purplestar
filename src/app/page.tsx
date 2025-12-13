@@ -34,7 +34,8 @@ type ChartMode = 'focus' | 'grid';
 export default function Home() {
   // 1. State Management
   const [view, setView] = useState<ViewMode>('home');
-  const [chartMode, setChartMode] = useState<ChartMode>('focus');
+  const [chartMode, setChartMode] = useState<ChartMode>('grid');
+  const [gridStyle, setGridStyle] = useState<'classic' | 'modern'>('classic');
   const [userData, setUserData] = useState<{
     date: Date;
     gender: "male" | "female";
@@ -95,7 +96,7 @@ export default function Home() {
       
       // Transition to Chart View
       setView('chart');
-      setChartMode('focus');
+      setChartMode('grid');
     } catch (e) {
       console.error("Chart generation failed:", e);
       alert("排盘失败，请检查输入信息");
@@ -107,6 +108,14 @@ export default function Home() {
       if (direction === 'next') return (prev + 1) % 12;
       return (prev - 1 + 12) % 12;
     });
+  };
+
+  const handleModeChange = (mode: ChartMode) => {
+    if (mode === 'grid' && chartMode === 'grid') {
+      setGridStyle(prev => prev === 'classic' ? 'modern' : 'classic');
+    } else {
+      setChartMode(mode);
+    }
   };
 
   if (!mounted) return null;
@@ -250,6 +259,8 @@ export default function Home() {
                     <FullBoard 
                       chart={chart}
                       activeIndex={activeIndex}
+                      gridStyle={gridStyle}
+                      onToggleStyle={() => setGridStyle(prev => prev === 'classic' ? 'modern' : 'classic')}
                       onSelect={(idx) => {
                         setActiveIndex(idx);
                         setChartMode('focus');
@@ -265,7 +276,7 @@ export default function Home() {
             <div className="pb-8 pt-2 px-6 z-50">
                <BottomNavBar 
                  currentMode={chartMode}
-                 onModeChange={setChartMode}
+                 onModeChange={handleModeChange}
                  onAskAI={() => setShowAI(true)}
                />
             </div>

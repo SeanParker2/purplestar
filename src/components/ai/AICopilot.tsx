@@ -2,7 +2,8 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Sparkles, Minimize2, Bot, BookOpen, StopCircle } from "lucide-react";
+import { Send, Sparkles, Minimize2, Bot, BookOpen, StopCircle, Loader2 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
 import { type PalaceData, type ZiWeiChart } from "@/lib/ziwei";
 import { STAR_INTERPRETATIONS, type StarInterpretation } from "@/data/interpretations";
@@ -25,6 +26,44 @@ interface AICopilotProps {
 }
 
 // --- Component ---
+
+// --- Components ---
+const LoadingIndicator = () => {
+  const texts = [
+    "大师正在推演流年...",
+    "正在解析星曜...",
+    "连接天地磁场...",
+    "查询古籍断语...",
+    "推算飞星轨迹..."
+  ];
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setIndex((prev) => (prev + 1) % texts.length);
+    }, 2000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="flex items-center gap-3 px-1">
+      <div className="relative w-5 h-5">
+        <div className="absolute inset-0 border-2 border-gold-primary/30 rounded-full animate-spin-slow" />
+        <div className="absolute inset-0 border-t-2 border-gold-primary rounded-full animate-spin" />
+        <div className="absolute inset-1.5 bg-gold-primary/20 rounded-full animate-pulse" />
+      </div>
+      <motion.span 
+        key={index}
+        initial={{ opacity: 0, y: 5 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -5 }}
+        className="text-xs text-gold-light/80 font-serif tracking-widest min-w-[120px]"
+      >
+        {texts[index]}
+      </motion.span>
+    </div>
+  );
+};
 
 export default function AICopilot({ chart, palaceData, className, isOpen: externalIsOpen, onClose }: AICopilotProps) {
   const [internalIsOpen, setInternalIsOpen] = useState(false);
@@ -361,23 +400,39 @@ export default function AICopilot({ chart, palaceData, className, isOpen: extern
           >
             <div
               className={cn(
-                "max-w-[85%] rounded-lg px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap",
+                "max-w-[85%] rounded-lg px-4 py-2.5 text-sm leading-relaxed",
                 msg.role === "user"
                   ? "bg-gold-primary text-void font-medium"
                   : "bg-white/10 text-gray-100 border border-white/5"
               )}
             >
-              {msg.content}
+              {msg.role === "user" ? (
+                msg.content
+              ) : (
+                <ReactMarkdown
+                  components={{
+                    p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
+                    strong: ({ children }) => <span className="font-bold text-gold-light">{children}</span>,
+                    ul: ({ children }) => <ul className="list-disc list-inside my-2 space-y-1">{children}</ul>,
+                    ol: ({ children }) => <ol className="list-decimal list-inside my-2 space-y-1">{children}</ol>,
+                    li: ({ children }) => <li className="text-gray-200">{children}</li>,
+                    blockquote: ({ children }) => (
+                      <blockquote className="border-l-2 border-gold-primary/50 pl-3 my-2 italic text-white/60">
+                        {children}
+                      </blockquote>
+                    ),
+                  }}
+                >
+                  {msg.content}
+                </ReactMarkdown>
+              )}
             </div>
           </div>
         ))}
         {isTyping && (
-          <div className="flex justify-start items-center gap-2">
-            <div className="bg-white/10 rounded-lg px-4 py-3 flex gap-1 items-center">
-              <span className="text-xs text-gold-light/70 mr-2">大师正在推演...</span>
-              <span className="w-1.5 h-1.5 bg-gold-primary/50 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-              <span className="w-1.5 h-1.5 bg-gold-primary/50 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-              <span className="w-1.5 h-1.5 bg-gold-primary/50 rounded-full animate-bounce"></span>
+          <div className="flex justify-start items-center gap-2 pl-2">
+            <div className="bg-white/5 border border-white/10 rounded-lg px-4 py-3">
+              <LoadingIndicator />
             </div>
             <button 
               onClick={handleStopGeneration}
