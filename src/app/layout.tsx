@@ -5,15 +5,21 @@ import Script from "next/script";
 import "./globals.css";
 
 // TODO: Replace with your actual domain when deployed
-const SITE_URL = "https://ziyuan.app";
+const SITE_URL = "https://www.purplestar.top";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "PurpleStar - Professional Zi Wei Dou Shu Astrolabe",
   description: "PurpleStar is a professional Zi Wei Dou Shu astrolabe tool based on true solar time. Integrating traditional I-Ching wisdom with modern AI technology, it provides precise chart calculations, yearly fortune analysis, and personalized guidance.",
-  keywords: ["PurpleStar", "Zi Wei Dou Shu", "Astrolabe", "Fortune Telling", "AI", "True Solar Time", "Chinese Astrology"],
+  keywords: ["紫微斗数", "紫垣", "PurpleStar", "在线排盘", "命理分析", "AI算命", "紫微斗数排盘", "算命免费", "流年运势", "生辰八字"],
   manifest: "/manifest.json",
   alternates: {
-    canonical: SITE_URL,
+    canonical: '/',
+  },
+  verification: {
+    other: {
+      'baidu-site-verification': 'code-placeholder',
+    },
   },
   openGraph: {
     title: "PurpleStar - Professional Zi Wei Dou Shu Astrolabe",
