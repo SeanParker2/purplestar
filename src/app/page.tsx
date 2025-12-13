@@ -170,14 +170,12 @@ export default function Home() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
           >
-            {/* Level 2: Flying Star Overlay (Focus Mode Only) */}
-            {chartMode === 'focus' && (
-              <div className="absolute inset-0 pointer-events-none z-0">
-                <FlyingStarOverlay 
-                  paths={[]} // TODO: Implement path calculation logic
-                />
-              </div>
-            )}
+            {/* Level 2: Flying Star Overlay */}
+            <FlyingStarOverlay 
+              activeIndex={activeIndex}
+              flyingStars={transformedPalaces}
+              className="z-0"
+            />
 
             {/* Header: User Info */}
             <header className="flex justify-between items-center px-6 pt-6 pb-2 z-20">

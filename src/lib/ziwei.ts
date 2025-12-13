@@ -2,6 +2,7 @@ import { Solar } from 'lunar-javascript';
 import { astro } from 'iztro';
 import { GenderName } from 'iztro/lib/i18n';
 import FunctionalAstrolabe from 'iztro/lib/astro/FunctionalAstrolabe';
+import { Horoscope } from 'iztro/lib/data/types';
 import { calculateTrueSolarTime, getTimeIndexFromDate } from './time-utils';
 
 // Define input types
@@ -34,6 +35,9 @@ export interface ZiWeiChart {
   bodyOwner: string;
   palaces: PalaceData[];
   yearly: PalaceData[];
+  solarDateStr?: string;
+  timeIndex?: number;
+  gender?: Gender;
 }
 
 /**
@@ -54,7 +58,8 @@ export class ZiWeiCalculator {
   static getZiWeiChartByDate(
     date: Date,
     longitude: number = 120,
-    gender: Gender
+    gender: Gender,
+    year?: number
   ): ZiWeiChart {
     // 1. Calculate True Solar Time
     const trueSolarDate = calculateTrueSolarTime(date, longitude);
@@ -68,7 +73,7 @@ export class ZiWeiCalculator {
     const timeIndex = getTimeIndexFromDate(trueSolarDate) as TimeIndex;
     
     // 3. Call internal generator
-    return this.getZiWeiChart(solarDateStr, timeIndex, gender);
+    return this.getZiWeiChart(solarDateStr, timeIndex, gender, year);
   }
 
   /**
@@ -81,7 +86,8 @@ export class ZiWeiCalculator {
   static getZiWeiChart(
     solarDateStr: SolarDateStr,
     timeIndex: TimeIndex,
-    gender: Gender
+    gender: Gender,
+    targetYear?: number | string
   ): ZiWeiChart {
     // 1. Validate Input
     if (!/^\d{4}-\d{1,2}-\d{1,2}$/.test(solarDateStr)) {
@@ -114,16 +120,29 @@ export class ZiWeiCalculator {
 
     // 5. Extract Yearly Data
     // Default to the year of the date if not provided
-    // const targetYear = year || y; // unused for now
+    const flowYear = targetYear || y;
+    // Ensure flowYear is treated as a date string for iztro to correctly determine the yearly stem
+    // Using mid-year to be safe within the lunar year, or just Jan 1st?
+    // iztro likely uses the date to determine the Lunar Year.
+    // If we want the chart for the Lunar Year corresponding to flowYear, we should probably pass a date that is definitely in that Lunar Year.
+    // However, iztro.horoscope(date) likely calculates the daily/monthly/yearly stars for THAT date.
+    // But we only want the YEARLY chart (Liu Nian).
+    // The Yearly chart is constant for the whole Lunar Year.
+    // Let's pass a date string.
+    const horoscope = astrolabe.horoscope(`${flowYear}-06-15`);
     
-    const yearlyPalacesData = this.extractYearlyPalaces(astrolabe);
+    const yearlyPalacesData = this.extractYearlyPalaces(astrolabe, horoscope);
 
+    // 6. Return Result
     return {
       fiveElements: astrolabe.fiveElementsClass,
       lifeOwner: astrolabe.soul,
       bodyOwner: astrolabe.body,
       palaces: palacesData,
       yearly: yearlyPalacesData,
+      solarDateStr,
+      timeIndex,
+      gender
     };
   }
 
@@ -217,26 +236,87 @@ export class ZiWeiCalculator {
   /**
    * Helper to extract yearly palace data
    */
-  private static extractYearlyPalaces(astrolabe: FunctionalAstrolabe): PalaceData[] {
+  private static extractYearlyPalaces(astrolabe: FunctionalAstrolabe, horoscope: Horoscope): PalaceData[] {
     const palaces: PalaceData[] = [];
+    const yearlyMutagens = horoscope.yearly.mutagen; // Array of star names [Lu, Quan, Ke, Ji]
 
     for (let i = 0; i < 12; i++) {
+      // Use horoscope.palace(i) if available (user request), but iztro doesn't support it directly by index.
+      // We simulate it by accessing data by index which corresponds to the sector.
       const p = astrolabe.palace(i);
       if (!p) continue;
 
-      // In a real implementation, we would calculate yearly stars and yearly transformations here.
-      // For now, we return the base palace structure with isYearly=true.
-      const transformations: string[] = [];
+      // 1. Yearly Palace Name
+      // Assuming horoscope.yearly.palaceNames is aligned with sectors 0..11
+      const yearlyName = horoscope.yearly.palaceNames[i];
+
+      // 2. Yearly Stars
+      // horoscope.yearly.stars[i] is array of stars for this sector
+      const yearlyStars = horoscope.yearly.stars?.[i] || [];
       
+      const mappedYearlyStars: Star[] = yearlyStars.map((s: any) => ({
+        name: s.name,
+        mutagen: s.mutagen, 
+        brightness: s.brightness
+      }));
+
+      // 3. Yearly Transformations
+      // Check if any major star in the sector matches the yearly mutagen
+      const updatedMajorStars = p.majorStars.map(s => {
+        let mutagen = '';
+        const mIndex = yearlyMutagens.indexOf(s.name);
+        if (mIndex === 0) mutagen = '禄';
+        else if (mIndex === 1) mutagen = '权';
+        else if (mIndex === 2) mutagen = '科';
+        else if (mIndex === 3) mutagen = '忌';
+        
+        return {
+          name: s.name,
+          mutagen: mutagen || undefined, // Prioritize yearly mutagen
+          brightness: s.brightness
+        };
+      });
+
+      // Also check minor stars for transformations
+      const updatedMinorStars = p.minorStars.map(s => {
+         let mutagen = '';
+         const mIndex = yearlyMutagens.indexOf(s.name);
+         if (mIndex === 0) mutagen = '禄';
+         else if (mIndex === 1) mutagen = '权';
+         else if (mIndex === 2) mutagen = '科';
+         else if (mIndex === 3) mutagen = '忌';
+         return { ...s, mutagen: mutagen || undefined };
+      });
+
+      // 4. Jiang Qian 12 Stars (and Sui Qian 12 Stars)
+      const extraStars: Star[] = [];
+      // Access safe properties
+      const yearlyDecStar = (horoscope.yearly as any).yearlyDecStar;
+      
+      if (yearlyDecStar) {
+        if (yearlyDecStar.jiangqian12 && yearlyDecStar.jiangqian12[i]) {
+            extraStars.push({ name: yearlyDecStar.jiangqian12[i] });
+        }
+        if (yearlyDecStar.suiqian12 && yearlyDecStar.suiqian12[i]) {
+            extraStars.push({ name: yearlyDecStar.suiqian12[i] });
+        }
+      }
+
+      const allMiscStars = [
+         ...p.adjectiveStars.map(s => ({ name: s.name, mutagen: s.mutagen, brightness: s.brightness })),
+         ...mappedYearlyStars,
+         ...extraStars
+      ];
+
       palaces.push({
-        palaceName: p.name,
+        palaceName: yearlyName,
         stem: p.heavenlyStem,
         branch: p.earthlyBranch,
         heavenlyEarthly: p.heavenlyStem + p.earthlyBranch,
-        majorStars: p.majorStars.map(s => ({ name: s.name, mutagen: s.mutagen, brightness: s.brightness })),
-        minorStars: p.minorStars.map(s => ({ name: s.name, mutagen: s.mutagen, brightness: s.brightness })),
-        miscStars: p.adjectiveStars.map(s => ({ name: s.name, mutagen: s.mutagen, brightness: s.brightness })),
-        transformations: transformations,
+        majorStars: updatedMajorStars,
+        minorStars: updatedMinorStars,
+        miscStars: allMiscStars,
+        transformations: updatedMajorStars.map(s => s.mutagen).filter(Boolean) as string[],
         isYearly: true,
       });
     }

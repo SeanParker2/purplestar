@@ -1,6 +1,8 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-@theme {
+:root {
   --color-void: #050508;
   --color-nebula-purple: rgba(88, 28, 135, 0.15);
   --color-nebula-blue: rgba(30, 58, 138, 0.15);
@@ -18,18 +20,6 @@
   --font-serif: "Songti SC", "Noto Serif SC", serif;
   --font-sans: "Helvetica Neue", sans-serif;
   
-  --animate-float: float 20s infinite ease-in-out;
-  --animate-spin-slow: spin 60s linear infinite;
-  --animate-spin-reverse: spin 40s linear infinite reverse;
-  --animate-spin-medium: spin 20s linear infinite;
-
-  @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-20px); }
-  }
-}
-
-:root {
   --background: var(--color-void);
   --foreground: var(--color-text-main);
 }

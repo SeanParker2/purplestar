@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Sparkles, Minimize2, Bot, BookOpen } from "lucide-react";
+import { Send, Sparkles, Minimize2, Bot, BookOpen, StopCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { type PalaceData, type ZiWeiChart } from "@/lib/ziwei";
 import { STAR_INTERPRETATIONS, type StarInterpretation } from "@/data/interpretations";
@@ -23,26 +23,6 @@ interface AICopilotProps {
   isOpen?: boolean;
   onClose?: () => void;
 }
-
-// --- Mock AI Service ---
-
-const MOCK_RESPONSES = [
-  "从星象来看，此宫位吉星高照，主星得力，预示着顺遂的发展趋势。若能把握机会，定能有所斩获。",
-  "此宫位受化忌星影响，可能会有一些波折和变动。建议稳中求进，不可操之过急，注意防范潜在的风险。",
-  "主星庙旺，且有吉星拱照，这是一个非常有力的格局。在相关领域投入精力，必有丰厚回报。",
-  "虽然主星平平，但辅星配合得当，呈现出一种平稳上升的态势。适合积累沉淀，等待时机。",
-  "此处星曜组合略显驳杂，显示出内心的纠结与外部环境的多变。建议保持冷静，理清思路再做决定。",
-];
-
-// --- Star Name Mapping ---
-const STAR_NAME_MAP: Record<string, string> = {
-  "紫微": "ZiWei",
-  "天机": "TianJi",
-  "太阳": "TaiYang",
-  "武曲": "WuQu",
-  "天同": "TianTong",
-  "廉贞": "LianZhen"
-};
 
 // --- Component ---
 
@@ -81,6 +61,7 @@ export default function AICopilot({ chart, palaceData, className, isOpen: extern
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Load Knowledge Base
   useEffect(() => {
@@ -98,30 +79,16 @@ export default function AICopilot({ chart, palaceData, className, isOpen: extern
       // Only search if we have major stars
       if (palaceData.majorStars && palaceData.majorStars.length > 0) {
         // Try to find a match for any of the major stars
-        // Currently only supporting Life Palace mappings as per data
-        // But we will try to match regardless of palace, if the key exists (which currently is only _Life)
-        // If the user adds more data like ZiWei_Wealth, it would work if we dynamically check.
-        // For now, we assume data is primarily for Life Palace context or general star nature if we relax the key check.
-        // However, the task says "Precise Match".
-        // And data keys are "ZiWei_Life".
-        // So we strictly look for `${Star}_Life` if we are in Life palace?
-        // Or should we look for `${Star}_Life` even if we are in other palace, using it as "general interpretation"?
-        // The summary says "紫微坐命...". So it's specific to Life Palace.
-        // So we should only show it if we are in Life Palace.
-        
-        const suffix = palaceData.palaceName === "命宫" ? "Life" : null;
-        
-        if (suffix) {
-          for (const star of palaceData.majorStars) {
-            const pinyin = STAR_NAME_MAP[star.name];
-            if (pinyin) {
-              const key = `${pinyin}_${suffix}`;
-              if (STAR_INTERPRETATIONS[key]) {
-                found = STAR_INTERPRETATIONS[key];
-                starName = star.name;
-                break; // Use the first match
-              }
-            }
+        for (const star of palaceData.majorStars) {
+          // Direct lookup in array
+          const match = STAR_INTERPRETATIONS.find(
+            (item) => item.star === star.name && item.palace === palaceData.palaceName
+          );
+
+          if (match) {
+            found = match;
+            starName = star.name;
+            break; // Use the first match
           }
         }
       }
@@ -140,6 +107,9 @@ export default function AICopilot({ chart, palaceData, className, isOpen: extern
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
     };
   }, []);
 
@@ -157,6 +127,24 @@ export default function AICopilot({ chart, palaceData, className, isOpen: extern
     }
   }, [isOpen]);
 
+  const handleStopGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      setIsTyping(false);
+      setMessages((prev) => {
+        const lastMsg = prev[prev.length - 1];
+        if (lastMsg.role === "assistant") {
+          return [
+            ...prev.slice(0, -1),
+            { ...lastMsg, content: lastMsg.content + "\n(已停止生成)" },
+          ];
+        }
+        return prev;
+      });
+    }
+  };
+
   // Handle Send Message
   const handleSendMessage = async (text: string, isAnalysisRequest: boolean = false) => {
     if (!text.trim()) return;
@@ -173,36 +161,117 @@ export default function AICopilot({ chart, palaceData, className, isOpen: extern
     setIsTyping(true);
 
     // Build Prompt with Knowledge Base
-    let systemPrompt = "";
+    let additionalContext = "";
     if (interpretation && matchedStarName) {
       // Sanitize input just in case
       const safeStarName = matchedStarName.replace(/[<>]/g, "");
       const safeSummary = interpretation.summary.replace(/[<>]/g, "");
-      
-      systemPrompt = `用户命宫主星是${safeStarName}。系统知识库记载：[${safeSummary}]。请结合此断语和流年运势进行扩展解读。`;
+      additionalContext = `\n\n相关断语参考（用户宫位：${palaceData.palaceName}，主星：${safeStarName}）：${safeSummary}`;
     }
 
-    // Mock AI Response with delay
-    timeoutRef.current = setTimeout(() => {
-      const randomResponse = MOCK_RESPONSES[Math.floor(Math.random() * MOCK_RESPONSES.length)];
-      
-      let responseContent = randomResponse;
-      if (isAnalysisRequest && interpretation) {
-        // In a real integration, the AI would use the systemPrompt to generate the response.
-        // Here we simulate it by mentioning the knowledge base.
-        responseContent = `[系统] 已检索到${matchedStarName}星断语，结合流年分析：\n\n${randomResponse}\n\n(参考：${interpretation.summary})`;
+    // Construct Chart Context
+    const chartContext = {
+      palace: palaceData,
+      basicInfo: chart ? {
+        gender: chart.gender,
+        solarDate: chart.solarDateStr,
+        timeIndex: chart.timeIndex
+      } : null,
+      knowledgeBase: additionalContext
+    };
+
+    // Filter history (exclude init message)
+    const history = messages
+      .filter(m => m.id !== 'init')
+      .map(m => ({ role: m.role, content: m.content }));
+    
+    const apiMessages = [...history, { role: 'user', content: text + additionalContext }];
+
+    // API Call
+    abortControllerRef.current = new AbortController();
+
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream',
+        },
+        body: JSON.stringify({
+          messages: apiMessages,
+          chartContext: chartContext
+        }),
+        signal: abortControllerRef.current.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.statusText}`);
       }
 
-      const newAiMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: responseContent,
-        timestamp: Date.now(),
-      };
+      // Prepare empty assistant message
+      const aiMsgId = (Date.now() + 1).toString();
+      setMessages(prev => [...prev, {
+        id: aiMsgId,
+        role: 'assistant',
+        content: '',
+        timestamp: Date.now()
+      }]);
 
-      setMessages((prev) => [...prev, newAiMsg]);
+      // Stream handling
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let aiContent = "";
+      let buffer = "";
+
+      if (!reader) throw new Error('No response body');
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
+        
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ""; // Keep the incomplete line
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const dataStr = line.slice(6).trim();
+            if (dataStr === '[DONE]') break;
+            
+            try {
+              const data = JSON.parse(dataStr);
+              // DeepSeek/OpenAI stream format: choices[0].delta.content
+              const content = data.choices?.[0]?.delta?.content || "";
+              if (content) {
+                aiContent += content;
+                setMessages(prev => prev.map(m => 
+                  m.id === aiMsgId ? { ...m, content: aiContent } : m
+                ));
+              }
+            } catch (e) {
+              console.warn('JSON parse error in stream:', e);
+            }
+          }
+        }
+      }
+
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.log('Request aborted');
+      } else {
+        setMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: `[系统提示] 抱歉，推演过程中遇到问题：${error.message}`,
+          timestamp: Date.now()
+        }]);
+      }
+    } finally {
       setIsTyping(false);
-    }, 1500);
+      abortControllerRef.current = null;
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -292,7 +361,7 @@ export default function AICopilot({ chart, palaceData, className, isOpen: extern
           >
             <div
               className={cn(
-                "max-w-[85%] rounded-lg px-4 py-2.5 text-sm leading-relaxed",
+                "max-w-[85%] rounded-lg px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap",
                 msg.role === "user"
                   ? "bg-gold-primary text-void font-medium"
                   : "bg-white/10 text-gray-100 border border-white/5"
@@ -303,12 +372,20 @@ export default function AICopilot({ chart, palaceData, className, isOpen: extern
           </div>
         ))}
         {isTyping && (
-          <div className="flex justify-start">
+          <div className="flex justify-start items-center gap-2">
             <div className="bg-white/10 rounded-lg px-4 py-3 flex gap-1 items-center">
+              <span className="text-xs text-gold-light/70 mr-2">大师正在推演...</span>
               <span className="w-1.5 h-1.5 bg-gold-primary/50 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
               <span className="w-1.5 h-1.5 bg-gold-primary/50 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
               <span className="w-1.5 h-1.5 bg-gold-primary/50 rounded-full animate-bounce"></span>
             </div>
+            <button 
+              onClick={handleStopGeneration}
+              className="p-2 rounded-full hover:bg-white/10 text-white/50 hover:text-red-400 transition-colors"
+              title="停止生成"
+            >
+              <StopCircle size={16} />
+            </button>
           </div>
         )}
         <div ref={messagesEndRef} />

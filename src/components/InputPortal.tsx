@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { CHINA_CITIES } from "./constants/cities";
 
 interface InputPortalProps {
   onSubmit: (data: { date: Date; longitude: number; gender: "male" | "female" }) => void;
@@ -11,14 +12,36 @@ interface InputPortalProps {
 export default function InputPortal({ onSubmit }: InputPortalProps) {
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
-  const [longitude, setLongitude] = useState("120.0"); // Keep as string for input handling
+  const [longitude, setLongitude] = useState<string | null>(null);
+  const [selectedCity, setSelectedCity] = useState<string>("");
   const [gender, setGender] = useState<"male" | "female">("male");
   const [error, setError] = useState("");
+
+  const handleCityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    setSelectedCity(value);
+    
+    if (value === "custom") {
+      setLongitude(""); // Reset or keep previous? Requirement says "allow manual input", implying clear or show input.
+    } else if (value === "") {
+      setLongitude(null);
+    } else {
+      const city = CHINA_CITIES.find(c => c.name === value);
+      if (city) {
+        setLongitude(city.lng.toString());
+      }
+    }
+  };
 
   const handleSubmit = () => {
     if (!date || !time) {
       setError("请填写完整的时间信息");
       return;
+    }
+
+    if (longitude === null || longitude === "") {
+       setError("请选择城市或输入经度");
+       return;
     }
 
     const lng = parseFloat(longitude);
@@ -28,10 +51,6 @@ export default function InputPortal({ onSubmit }: InputPortalProps) {
     }
 
     // Construct Date object
-    // Note: This creates a Date in the user's local timezone unless we force it.
-    // However, for Zi Wei Dou Shu, we typically treat the input as Beijing Time (UTC+8) 
-    // or just "Local Clock Time" which calculateTrueSolarTime will adjust.
-    // Let's assume the input is "Standard Time" (e.g. Beijing Time).
     const dateTimeStr = `${date}T${time}:00`;
     const d = new Date(dateTimeStr);
 
@@ -117,22 +136,53 @@ export default function InputPortal({ onSubmit }: InputPortalProps) {
             />
           </div>
 
-          {/* Longitude */}
+          {/* City / Longitude Selection */}
           <div className="space-y-1">
             <label className="text-[10px] text-gold-primary/60 uppercase tracking-wider block">
-              经度 (Longitude)
+              出生地点 (Location)
             </label>
-            <input
-              type="number"
-              step="0.1"
-              value={longitude}
-              onChange={(e) => setLongitude(e.target.value)}
+            <select
+              value={selectedCity}
+              onChange={handleCityChange}
               className={cn(
-                "w-full bg-transparent border-b border-gold-primary/30",
-                "text-gold-primary font-mono text-lg py-1",
-                "focus:outline-none focus:border-gold-primary transition-colors"
+                "w-full bg-[rgba(0,0,0,0.5)] border-b border-gold-primary/30",
+                "text-gold-primary font-mono text-lg py-1 appearance-none",
+                "focus:outline-none focus:border-gold-primary transition-colors cursor-pointer",
+                "hover:bg-[rgba(255,215,0,0.1)]"
               )}
-            />
+              style={{ borderRadius: 0 }} // Ensure flat look
+            >
+              <option value="">请选择城市</option>
+              {CHINA_CITIES.map((city) => (
+                <option key={city.name} value={city.name}>
+                  {city.name}
+                </option>
+              ))}
+              <option value="custom">自定义经度</option>
+            </select>
+            
+            {/* Custom Longitude Input */}
+            {selectedCity === "custom" && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                className="mt-2"
+              >
+                <input
+                  type="number"
+                  step="0.1"
+                  placeholder="输入经度 (例如: 120.0)"
+                  value={longitude || ""}
+                  onChange={(e) => setLongitude(e.target.value)}
+                  className={cn(
+                    "w-full bg-transparent border-b border-gold-primary/30",
+                    "text-gold-primary font-mono text-lg py-1",
+                    "focus:outline-none focus:border-gold-primary transition-colors",
+                    "placeholder:text-white/20"
+                  )}
+                />
+              </motion.div>
+            )}
           </div>
 
           {/* Gender Toggle */}
