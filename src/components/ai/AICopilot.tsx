@@ -15,6 +15,11 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   timestamp: number;
+  action?: {
+    type: "analyze_palace";
+    label: string;
+    palaceName: string;
+  };
 }
 
 interface AICopilotProps {
@@ -131,6 +136,33 @@ export default function AICopilot({ chart, palaceData, className, isOpen: extern
 
   // Chart State Tracking
   const prevChartRef = useRef<ZiWeiChart | null>(null);
+  const prevPalaceRef = useRef<string>(palaceData.palaceName);
+
+  // Check for palace changes
+  useEffect(() => {
+    if (prevPalaceRef.current !== palaceData.palaceName) {
+      if (isOpen) {
+        const starNames = palaceData.majorStars.map(s => s.name).join("、");
+        const label = starNames ? `分析此宫 [${palaceData.palaceName}·${starNames}]` : `分析此宫 [${palaceData.palaceName}]`;
+        
+        setMessages(prev => [
+          ...prev,
+          {
+            id: `system-switch-${Date.now()}`,
+            role: "assistant",
+            content: `检测到您已切换至 ${palaceData.palaceName}。`,
+            timestamp: Date.now(),
+            action: {
+              type: "analyze_palace",
+              label: label,
+              palaceName: palaceData.palaceName
+            }
+          }
+        ]);
+      }
+      prevPalaceRef.current = palaceData.palaceName;
+    }
+  }, [palaceData.palaceName, isOpen]);
 
   // Check for chart changes
   useEffect(() => {
@@ -554,6 +586,15 @@ export default function AICopilot({ chart, palaceData, className, isOpen: extern
                     >
                       {msg.content}
                     </ReactMarkdown>
+                  )}
+                  {msg.action && msg.action.type === 'analyze_palace' && (
+                    <button
+                      onClick={() => handleSendMessage(`请分析${msg.action!.palaceName}的运势`, true)}
+                      className="mt-3 w-full py-2 px-3 bg-gold-dark/20 hover:bg-gold-dark/30 border border-gold-primary/20 rounded text-sm text-gold-light transition-colors flex items-center justify-center gap-2 group"
+                    >
+                      <Sparkles size={14} className="group-hover:text-gold-primary" />
+                      {msg.action.label}
+                    </button>
                   )}
                 </div>
               </div>
