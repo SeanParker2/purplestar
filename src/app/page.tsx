@@ -7,7 +7,8 @@ import {
   Grid, 
   ChevronLeft, 
   ChevronRight,
-  Sparkles
+  Sparkles,
+  RotateCcw
 } from "lucide-react";
 
 // Components
@@ -34,8 +35,7 @@ type ChartMode = 'focus' | 'grid';
 export default function Home() {
   // 1. State Management
   const [view, setView] = useState<ViewMode>('home');
-  const [chartMode, setChartMode] = useState<ChartMode>('grid');
-  const [gridStyle, setGridStyle] = useState<'classic' | 'modern'>('classic');
+  const [chartMode, setChartMode] = useState<ChartMode>('focus');
   const [userData, setUserData] = useState<{
     date: Date;
     gender: "male" | "female";
@@ -46,10 +46,40 @@ export default function Home() {
   const [showAI, setShowAI] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  // Hydration fix
+  // Hydration fix & Persistence
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
+
+    // Load saved data
+    const savedData = localStorage.getItem('ziwei_user_data');
+    if (savedData) {
+      try {
+        const parsed = JSON.parse(savedData);
+        // Restore Date object
+        const date = new Date(parsed.date);
+        
+        // Regenerate Chart
+        const trueTime = calculateTrueSolarTime(date, parsed.longitude);
+        const newChart = ZiWeiCalculator.getZiWeiChartByDate(trueTime, parsed.longitude, parsed.gender);
+        
+        setChart(newChart);
+        setUserData({
+          date: date,
+          gender: parsed.gender,
+          name: parsed.name || "命主"
+        });
+
+        // Set Active Palace to Life Palace
+        const lifeIndex = newChart.palaces.findIndex(p => p.palaceName === "命宫");
+        setActiveIndex(lifeIndex !== -1 ? lifeIndex : 0);
+        
+        setView('chart');
+      } catch (e) {
+        console.error("Failed to restore saved data:", e);
+        localStorage.removeItem('ziwei_user_data');
+      }
+    }
   }, []);
 
   // 2. Flying Star Logic
@@ -96,7 +126,15 @@ export default function Home() {
       
       // Transition to Chart View
       setView('chart');
-      setChartMode('grid');
+      setChartMode('focus');
+
+      // Auto-save to localStorage
+      localStorage.setItem('ziwei_user_data', JSON.stringify({
+        date: data.date,
+        longitude: data.longitude,
+        gender: data.gender,
+        name: "命主"
+      }));
     } catch (e) {
       console.error("Chart generation failed:", e);
       alert("排盘失败，请检查输入信息");
@@ -110,11 +148,13 @@ export default function Home() {
     });
   };
 
-  const handleModeChange = (mode: ChartMode) => {
-    if (mode === 'grid' && chartMode === 'grid') {
-      setGridStyle(prev => prev === 'classic' ? 'modern' : 'classic');
-    } else {
-      setChartMode(mode);
+  const handleReset = () => {
+    if (confirm("确定要重新排盘吗？当前数据将清除。")) {
+      localStorage.removeItem('ziwei_user_data');
+      setChart(null);
+      setUserData(null);
+      setView('home');
+      setChartMode('focus');
     }
   };
 
@@ -194,7 +234,14 @@ export default function Home() {
                   {userData?.name || "命主"} · {chart.fiveElements}局 · {chart.lifeOwner}
                 </p>
               </div>
-              <div className="text-right">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={handleReset}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-full border border-gold-primary/20 bg-white/5 text-xs text-gold-light/70 hover:text-gold-primary hover:border-gold-primary/50 transition-colors"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>新排盘</span>
+                </button>
                 <div className="text-xs text-gold-light opacity-80 border border-gold-primary/30 px-2 py-1 rounded">
                   {chart.palaces[activeIndex].heavenlyEarthly}年
                 </div>
@@ -259,8 +306,6 @@ export default function Home() {
                     <FullBoard 
                       chart={chart}
                       activeIndex={activeIndex}
-                      gridStyle={gridStyle}
-                      onToggleStyle={() => setGridStyle(prev => prev === 'classic' ? 'modern' : 'classic')}
                       onSelect={(idx) => {
                         setActiveIndex(idx);
                         setChartMode('focus');
@@ -276,7 +321,7 @@ export default function Home() {
             <div className="pb-8 pt-2 px-6 z-50">
                <BottomNavBar 
                  currentMode={chartMode}
-                 onModeChange={handleModeChange}
+                 onModeChange={setChartMode}
                  onAskAI={() => setShowAI(true)}
                />
             </div>

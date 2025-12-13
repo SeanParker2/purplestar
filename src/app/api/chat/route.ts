@@ -26,6 +26,9 @@ const SYSTEM_PROMPT_TEMPLATE = `
 请根据以上命盘信息和用户的提问，进行专业的紫微斗数分析。
 `;
 
+// Simple in-memory rate limiter (Map<IP, timestamp>)
+const rateLimitMap = new Map<string, number>();
+
 // Helper to simplify chart for AI context to save tokens and improve focus
 function simplifyChartForAI(chart: any): string {
   if (!chart) return "无命盘数据";
@@ -35,52 +38,45 @@ function simplifyChartForAI(chart: any): string {
 
     // 1. Basic Info
     parts.push(`【基本信息】`);
-    parts.push(`局数: ${chart.fiveElements || '未知'}`);
-    parts.push(`命主: ${chart.lifeOwner || '未知'}`);
-    parts.push(`身主: ${chart.bodyOwner || '未知'}`);
-    if (chart.gender) parts.push(`性别: ${chart.gender === 'male' ? '男' : '女'}`);
-    if (chart.solarDateStr) parts.push(`阳历: ${chart.solarDateStr}`);
+    parts.push(`局数: ${chart.fiveElements || '未知'}, 命主: ${chart.lifeOwner || '未知'}, 身主: ${chart.bodyOwner || '未知'}`);
 
     // 2. Palaces
-    parts.push(`\n【十二宫位分布】`);
+    parts.push(`【十二宫位】`);
     if (Array.isArray(chart.palaces)) {
       chart.palaces.forEach((p: any) => {
-        // Palace Header: Name + Stem/Branch
-        let palaceStr = `${p.palaceName}(${p.heavenlyEarthly}): `;
-
-        // Major Stars with Brightness and Mutagen
-        const majorStars = Array.isArray(p.majorStars) 
+        let content = `${p.palaceName}(${p.heavenlyEarthly}): `;
+        
+        // Major Stars
+        const majors = Array.isArray(p.majorStars) 
           ? p.majorStars.map((s: any) => {
-              let sStr = s.name;
-              if (s.mutagen) sStr += `(${s.mutagen})`;
-              if (s.brightness) sStr += `[${s.brightness}]`;
-              return sStr;
-            }).join(", ")
-          : "";
-        
-        if (majorStars) palaceStr += `${majorStars}`;
-        else palaceStr += "无主星";
+              let str = s.name;
+              if (s.mutagen) str += `(${s.mutagen})`;
+              if (s.brightness) str += `[${s.brightness}]`;
+              return str;
+            })
+          : [];
 
-        // Minor Stars (Name only to save space)
-        const minorStars = Array.isArray(p.minorStars)
-          ? p.minorStars.map((s: any) => s.name).join(", ")
-          : "";
+        // Minor Stars
+        const minors = Array.isArray(p.minorStars)
+          ? p.minorStars.map((s: any) => {
+              let str = s.name;
+              if (s.mutagen) str += `(${s.mutagen})`;
+              return str;
+            })
+          : [];
         
-        if (minorStars) palaceStr += `, ${minorStars}`;
+        // Misc Stars (Only if mutagen is present)
+        const miscs = Array.isArray(p.miscStars)
+          ? p.miscStars
+              .filter((s: any) => s.mutagen)
+              .map((s: any) => `${s.name}(${s.mutagen})`)
+          : [];
 
-        parts.push(palaceStr);
+        const allStars = [...majors, ...minors, ...miscs].join(", ");
+        content += allStars || "无核心星曜";
+        
+        parts.push(content);
       });
-    }
-
-    // 3. Yearly Info (Brief)
-    if (Array.isArray(chart.yearly) && chart.yearly.length > 0) {
-      parts.push(`\n【流年信息】`);
-      // Find the Yearly Life Palace (Liu Nian Ming Gong)
-      const yearlyLifePalace = chart.yearly.find((p: any) => p.palaceName === '命宫');
-      if (yearlyLifePalace) {
-         parts.push(`流年命宫在: ${yearlyLifePalace.heavenlyEarthly}`);
-      }
-      // Can add more yearly highlights if needed, but keeping it minimal for now
     }
 
     return parts.join("\n");
@@ -92,6 +88,19 @@ function simplifyChartForAI(chart: any): string {
 
 export async function POST(req: NextRequest) {
   try {
+    // 0. Rate Limiting
+    const ip = req.headers.get('x-forwarded-for') || 'unknown-ip';
+    const now = Date.now();
+    const lastRequestTime = rateLimitMap.get(ip);
+
+    if (lastRequestTime && (now - lastRequestTime < 60000)) { // 1 minute limit
+      return NextResponse.json(
+        { error: 'Too Many Requests. Please try again in a minute.' },
+        { status: 429 }
+      );
+    }
+    rateLimitMap.set(ip, now);
+
     // 1. Validate Environment Variables
     const BASE_URL = process.env.DEEPSEEK_BASE_URL;
     const API_KEY = process.env.DEEPSEEK_API_KEY;
