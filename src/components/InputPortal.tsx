@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { CHINA_CITIES } from "./constants/cities";
+import LegalDocs from "./modals/LegalDocs";
 
 interface InputPortalProps {
   onSubmit: (data: { date: Date; longitude: number; gender: "male" | "female" }) => void;
@@ -16,6 +17,11 @@ export default function InputPortal({ onSubmit }: InputPortalProps) {
   const [selectedCity, setSelectedCity] = useState<string>("");
   const [gender, setGender] = useState<"male" | "female">("male");
   const [error, setError] = useState("");
+  
+  // Compliance State
+  const [isAgreed, setIsAgreed] = useState(false);
+  const [isLegalOpen, setIsLegalOpen] = useState(false);
+  const [shakeAgreement, setShakeAgreement] = useState(false);
 
   const handleCityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
@@ -34,6 +40,15 @@ export default function InputPortal({ onSubmit }: InputPortalProps) {
   };
 
   const handleSubmit = () => {
+    // 1. Check Agreement
+    if (!isAgreed) {
+      setShakeAgreement(true);
+      setError("请先同意服务条款");
+      // Reset shake animation after a short delay
+      setTimeout(() => setShakeAgreement(false), 500);
+      return;
+    }
+
     if (!date || !time) {
       setError("请填写完整的时间信息");
       return;
@@ -225,9 +240,39 @@ export default function InputPortal({ onSubmit }: InputPortalProps) {
           </div>
         </div>
 
+        {/* Agreement Checkbox */}
+        <motion.div 
+          animate={shakeAgreement ? { x: [-5, 5, -5, 5, 0] } : {}}
+          transition={{ duration: 0.4 }}
+          className="flex items-center justify-center gap-2 mt-[-10px]"
+        >
+          <input 
+            type="checkbox" 
+            id="agreement"
+            checked={isAgreed}
+            onChange={(e) => {
+              setIsAgreed(e.target.checked);
+              if (e.target.checked) setError("");
+            }}
+            className="w-3 h-3 rounded border-gold-primary/50 bg-white/5 text-gold-primary focus:ring-0 cursor-pointer accent-gold-primary"
+          />
+          <label htmlFor="agreement" className="text-[10px] text-text-muted/80 select-none cursor-pointer">
+            我已阅读并同意
+            <span 
+              onClick={(e) => {
+                e.preventDefault();
+                setIsLegalOpen(true);
+              }}
+              className="text-gold-primary hover:text-gold-light ml-1 underline underline-offset-2 cursor-pointer transition-colors"
+            >
+              《用户协议》与《隐私政策》
+            </span>
+          </label>
+        </motion.div>
+
         {/* Error Message */}
         {error && (
-          <div className="text-red-400 text-xs text-center font-serif tracking-wide">
+          <div className="text-red-400 text-xs text-center font-serif tracking-wide animate-pulse">
             {error}
           </div>
         )}
@@ -240,12 +285,16 @@ export default function InputPortal({ onSubmit }: InputPortalProps) {
             "bg-gold-primary text-void-bg font-serif font-bold tracking-[4px]",
             "rounded-full shadow-[0_0_20px_rgba(229,195,101,0.3)]",
             "hover:bg-gold-light hover:shadow-[0_0_30px_rgba(229,195,101,0.5)]",
-            "transition-all duration-300 transform active:scale-95"
+            "transition-all duration-300 transform active:scale-95",
+            !isAgreed && "opacity-80 grayscale-[0.3]"
           )}
         >
           开启命盘
         </button>
       </motion.div>
+
+      {/* Legal Modal */}
+      <LegalDocs isOpen={isLegalOpen} onClose={() => setIsLegalOpen(false)} />
     </motion.div>
   );
 }

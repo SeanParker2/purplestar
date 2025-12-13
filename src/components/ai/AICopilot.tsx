@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Sparkles, Minimize2, Bot, BookOpen, StopCircle, Loader2 } from "lucide-react";
+import { Send, Sparkles, Minimize2, X, Bot, BookOpen, StopCircle, Maximize2, MessageCircle } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
 import { type PalaceData, type ZiWeiChart } from "@/lib/ziwei";
@@ -25,7 +25,22 @@ interface AICopilotProps {
   onClose?: () => void;
 }
 
-// --- Component ---
+// --- Helper Hooks ---
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    if (media.matches !== matches) {
+      setMatches(media.matches);
+    }
+    const listener = () => setMatches(media.matches);
+    media.addEventListener("change", listener);
+    return () => media.removeEventListener("change", listener);
+  }, [matches, query]);
+
+  return matches;
+}
 
 // --- Components ---
 const LoadingIndicator = () => {
@@ -66,8 +81,12 @@ const LoadingIndicator = () => {
 };
 
 export default function AICopilot({ chart, palaceData, className, isOpen: externalIsOpen, onClose }: AICopilotProps) {
-  const [internalIsOpen, setInternalIsOpen] = useState(false);
+  // Layout State
+  const isDesktop = useMediaQuery("(min-width: 768px)");
+  const [isMinimized, setIsMinimized] = useState(false);
 
+  // Visibility Control
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
   const isControlled = externalIsOpen !== undefined;
   const isOpen = isControlled ? externalIsOpen : internalIsOpen;
 
@@ -81,6 +100,14 @@ export default function AICopilot({ chart, palaceData, className, isOpen: extern
     }
   };
   
+  // Reset minimized state when opened
+  useEffect(() => {
+    if (isOpen) {
+      setIsMinimized(false);
+    }
+  }, [isOpen]);
+
+  // Chat State
   const [isTyping, setIsTyping] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [messages, setMessages] = useState<Message[]>([
@@ -154,17 +181,18 @@ export default function AICopilot({ chart, palaceData, className, isOpen: extern
 
   // Auto-scroll to bottom
   useEffect(() => {
-    if (messagesEndRef.current) {
+    if (messagesEndRef.current && !isMinimized && isOpen) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages, isTyping, isOpen, interpretation]);
+  }, [messages, isTyping, isOpen, interpretation, isMinimized]);
 
-  // Focus input on open
+  // Focus input on open/expand
   useEffect(() => {
-    if (isOpen && inputRef.current) {
-      inputRef.current.focus();
+    if (isOpen && !isMinimized && inputRef.current) {
+      // Small delay to allow animation to complete
+      setTimeout(() => inputRef.current?.focus(), 300);
     }
-  }, [isOpen]);
+  }, [isOpen, isMinimized]);
 
   const handleStopGeneration = () => {
     if (abortControllerRef.current) {
@@ -323,159 +351,217 @@ export default function AICopilot({ chart, palaceData, className, isOpen: extern
   if (!isOpen) return null;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20, scale: 0.95 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 20, scale: 0.95 }}
-      className={cn(
-        "fixed bottom-24 right-6 w-96 h-[500px] bg-void/95 border border-gold-primary/30 rounded-xl shadow-2xl flex flex-col overflow-hidden backdrop-blur-md z-50",
-        className
-      )}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gold-primary/20 bg-gold-dark/10">
-        <div className="flex items-center gap-2 text-gold-primary">
-          <Bot size={20} />
-          <span className="font-serif font-medium tracking-wide">紫微斗数 AI 助手</span>
-        </div>
-        <button
-          onClick={() => setIsOpen(false)}
-          className="text-white/50 hover:text-white transition-colors"
+    <AnimatePresence mode="wait">
+      {isMinimized ? (
+        // --- Minimized View (Floating Icon) ---
+        <motion.button
+          key="minimized"
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.8 }}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setIsMinimized(false)}
+          className={cn(
+            "fixed z-50 flex flex-col items-center justify-center gap-1",
+            isDesktop ? "bottom-6 right-6" : "bottom-24 right-4"
+          )}
         >
-          <Minimize2 size={18} />
-        </button>
-      </div>
+          <div className="relative w-14 h-14 rounded-full bg-gold-primary/20 backdrop-blur-md border border-gold-primary/50 flex items-center justify-center shadow-[0_0_20px_rgba(212,175,55,0.3)] overflow-hidden group">
+            <div className="absolute inset-0 bg-gold-primary/10 group-hover:bg-gold-primary/20 transition-colors" />
+            <Sparkles className="w-6 h-6 text-gold-primary animate-pulse" />
+          </div>
+          <span className="text-[10px] font-medium text-gold-primary/80 bg-black/50 px-2 py-0.5 rounded-full backdrop-blur-sm">
+            问策
+          </span>
+        </motion.button>
+      ) : (
+        // --- Expanded View (Chat Window) ---
+        <motion.div
+          key="expanded"
+          initial={isDesktop 
+            ? { opacity: 0, x: 20, y: 0 } 
+            : { opacity: 0, y: "100%" }
+          }
+          animate={isDesktop 
+            ? { opacity: 1, x: 0, y: 0 } 
+            : { opacity: 1, y: 0 }
+          }
+          exit={isDesktop 
+            ? { opacity: 0, x: 20 } 
+            : { opacity: 0, y: "100%" }
+          }
+          transition={{ type: "spring", damping: 25, stiffness: 300 }}
+          className={cn(
+            "fixed z-50 flex flex-col overflow-hidden shadow-2xl backdrop-blur-xl bg-void/90 border border-gold-primary/20",
+            isDesktop 
+              ? "bottom-6 right-6 w-96 h-[600px] rounded-2xl" 
+              : "bottom-0 left-0 right-0 h-[50vh] rounded-t-2xl border-b-0"
+          )}
+        >
+          {/* Mobile Drag Handle */}
+          {!isDesktop && (
+            <div className="w-full flex justify-center pt-2 pb-1 bg-white/5 cursor-grab active:cursor-grabbing" onClick={() => setIsMinimized(true)}>
+              <div className="w-12 h-1.5 bg-white/20 rounded-full" />
+            </div>
+          )}
 
-      {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-gold-primary/20 scrollbar-track-transparent">
-        
-        {/* Featured Interpretation Card */}
-        <AnimatePresence>
-          {isLoadingKnowledge ? (
-             <motion.div
-               initial={{ opacity: 0, height: 0 }}
-               animate={{ opacity: 1, height: "auto" }}
-               exit={{ opacity: 0, height: 0 }}
-               className="mb-4"
-             >
-               <div className="bg-white/5 border border-white/10 rounded-lg p-4 space-y-2 animate-pulse">
-                 <div className="h-4 w-1/3 bg-white/10 rounded"></div>
-                 <div className="h-16 w-full bg-white/10 rounded"></div>
-               </div>
-             </motion.div>
-          ) : interpretation ? (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-gradient-to-br from-gold-dark/20 to-void border border-gold-primary/30 rounded-lg p-4 mb-4 relative overflow-hidden group"
-            >
-              <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
-                <BookOpen size={48} />
-              </div>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs font-bold px-2 py-0.5 rounded bg-gold-primary text-void">精选断语</span>
-                <span className="text-xs text-gold-light/70">{matchedStarName} · {palaceData.palaceName}</span>
-              </div>
-              <p className="text-sm text-gray-200 leading-relaxed font-serif">
-                {interpretation.summary}
-              </p>
-              <div className="mt-2 flex flex-wrap gap-1">
-                {interpretation.tags.map(tag => (
-                  <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full border border-white/10 text-white/60">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gold-primary/20 bg-gold-dark/5">
+            <div className="flex items-center gap-2 text-gold-primary">
+              <Bot size={20} />
+              <span className="font-serif font-medium tracking-wide">紫微斗数 AI</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setIsMinimized(true)}
+                className="p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+                title="最小化"
+              >
+                <Minimize2 size={16} />
+              </button>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="p-1.5 rounded-lg text-white/50 hover:text-red-400 hover:bg-white/10 transition-colors"
+                title="关闭"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
 
-        {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={cn(
-              "flex w-full",
-              msg.role === "user" ? "justify-end" : "justify-start"
-            )}
-          >
-            <div
-              className={cn(
-                "max-w-[85%] rounded-lg px-4 py-2.5 text-sm leading-relaxed",
-                msg.role === "user"
-                  ? "bg-gold-primary text-void font-medium"
-                  : "bg-white/10 text-gray-100 border border-white/5"
-              )}
-            >
-              {msg.role === "user" ? (
-                msg.content
-              ) : (
-                <ReactMarkdown
-                  components={{
-                    p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
-                    strong: ({ children }) => <span className="font-bold text-gold-light">{children}</span>,
-                    ul: ({ children }) => <ul className="list-disc list-inside my-2 space-y-1">{children}</ul>,
-                    ol: ({ children }) => <ol className="list-decimal list-inside my-2 space-y-1">{children}</ol>,
-                    li: ({ children }) => <li className="text-gray-200">{children}</li>,
-                    blockquote: ({ children }) => (
-                      <blockquote className="border-l-2 border-gold-primary/50 pl-3 my-2 italic text-white/60">
-                        {children}
-                      </blockquote>
-                    ),
-                  }}
+          {/* Messages Area */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-gold-primary/20 scrollbar-track-transparent">
+            
+            {/* Featured Interpretation Card */}
+            <AnimatePresence>
+              {isLoadingKnowledge ? (
+                 <motion.div
+                   initial={{ opacity: 0, height: 0 }}
+                   animate={{ opacity: 1, height: "auto" }}
+                   exit={{ opacity: 0, height: 0 }}
+                   className="mb-4"
+                 >
+                   <div className="bg-white/5 border border-white/10 rounded-lg p-4 space-y-2 animate-pulse">
+                     <div className="h-4 w-1/3 bg-white/10 rounded"></div>
+                     <div className="h-16 w-full bg-white/10 rounded"></div>
+                   </div>
+                 </motion.div>
+              ) : interpretation ? (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-liner-to-br from-gold-dark/20 to-void border border-gold-primary/30 rounded-lg p-4 mb-4 relative overflow-hidden group"
                 >
-                  {msg.content}
-                </ReactMarkdown>
-              )}
-            </div>
-          </div>
-        ))}
-        {isTyping && (
-          <div className="flex justify-start items-center gap-2 pl-2">
-            <div className="bg-white/5 border border-white/10 rounded-lg px-4 py-3">
-              <LoadingIndicator />
-            </div>
-            <button 
-              onClick={handleStopGeneration}
-              className="p-2 rounded-full hover:bg-white/10 text-white/50 hover:text-red-400 transition-colors"
-              title="停止生成"
-            >
-              <StopCircle size={16} />
-            </button>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
+                  <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <BookOpen size={48} />
+                  </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xs font-bold px-2 py-0.5 rounded bg-gold-primary text-void">精选断语</span>
+                    <span className="text-xs text-gold-light/70">{matchedStarName} · {palaceData.palaceName}</span>
+                  </div>
+                  <p className="text-sm text-gray-200 leading-relaxed font-serif">
+                    {interpretation.summary}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {interpretation.tags.map(tag => (
+                      <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full border border-white/10 text-white/60">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
 
-      {/* Input Area */}
-      <div className="p-4 bg-void/50 border-t border-white/10">
-        {messages.length === 1 && (
-          <button
-            onClick={() => handleSendMessage(`请分析${palaceData.palaceName}的运势`, true)}
-            className="w-full mb-3 py-2 px-3 bg-gold-dark/20 hover:bg-gold-dark/30 border border-gold-primary/20 rounded text-sm text-gold-light transition-colors flex items-center justify-center gap-2 group"
-          >
-            <Sparkles size={14} className="group-hover:text-gold-primary" />
-            分析此宫 ({palaceData.palaceName})
-          </button>
-        )}
-        <div className="flex gap-2">
-          <input
-            ref={inputRef}
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="输入您的问题..."
-            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-gold-primary/50 transition-colors"
-          />
-          <button
-            onClick={() => handleSendMessage(inputValue)}
-            disabled={!inputValue.trim() || isTyping}
-            className="p-2 bg-gold-primary text-void rounded-lg hover:bg-gold-light disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            <Send size={18} />
-          </button>
-        </div>
-      </div>
-    </motion.div>
+            {messages.map((msg) => (
+              <div
+                key={msg.id}
+                className={cn(
+                  "flex w-full",
+                  msg.role === "user" ? "justify-end" : "justify-start"
+                )}
+              >
+                <div
+                  className={cn(
+                    "max-w-[85%] rounded-lg px-4 py-2.5 text-sm leading-relaxed",
+                    msg.role === "user"
+                      ? "bg-gold-primary text-void font-medium"
+                      : "bg-white/10 text-gray-100 border border-white/5"
+                  )}
+                >
+                  {msg.role === "user" ? (
+                    msg.content
+                  ) : (
+                    <ReactMarkdown
+                      components={{
+                        p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
+                        strong: ({ children }) => <span className="font-bold text-gold-light">{children}</span>,
+                        ul: ({ children }) => <ul className="list-disc list-inside my-2 space-y-1">{children}</ul>,
+                        ol: ({ children }) => <ol className="list-decimal list-inside my-2 space-y-1">{children}</ol>,
+                        li: ({ children }) => <li className="text-gray-200">{children}</li>,
+                        blockquote: ({ children }) => (
+                          <blockquote className="border-l-2 border-gold-primary/50 pl-3 my-2 italic text-white/60">
+                            {children}
+                          </blockquote>
+                        ),
+                      }}
+                    >
+                      {msg.content}
+                    </ReactMarkdown>
+                  )}
+                </div>
+              </div>
+            ))}
+            {isTyping && (
+              <div className="flex justify-start items-center gap-2 pl-2">
+                <div className="bg-white/5 border border-white/10 rounded-lg px-4 py-3">
+                  <LoadingIndicator />
+                </div>
+                <button 
+                  onClick={handleStopGeneration}
+                  className="p-2 rounded-full hover:bg-white/10 text-white/50 hover:text-red-400 transition-colors"
+                  title="停止生成"
+                >
+                  <StopCircle size={16} />
+                </button>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input Area */}
+          <div className="p-4 bg-void/30 border-t border-white/10">
+            {messages.length === 1 && (
+              <button
+                onClick={() => handleSendMessage(`请分析${palaceData.palaceName}的运势`, true)}
+                className="w-full mb-3 py-2 px-3 bg-gold-dark/20 hover:bg-gold-dark/30 border border-gold-primary/20 rounded text-sm text-gold-light transition-colors flex items-center justify-center gap-2 group"
+              >
+                <Sparkles size={14} className="group-hover:text-gold-primary" />
+                分析此宫 ({palaceData.palaceName})
+              </button>
+            )}
+            <div className="flex gap-2">
+              <input
+                ref={inputRef}
+                type="text"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="输入您的问题..."
+                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-gold-primary/50 transition-colors"
+              />
+              <button
+                onClick={() => handleSendMessage(inputValue)}
+                disabled={!inputValue.trim() || isTyping}
+                className="p-2 bg-gold-primary text-void rounded-lg hover:bg-gold-light disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <Send size={18} />
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

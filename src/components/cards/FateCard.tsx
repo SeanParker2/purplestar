@@ -4,6 +4,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { type Star } from "@/lib/ziwei";
+import { STAR_INTERPRETATIONS } from "@/data/interpretations";
 
 export interface FateCardProps {
   palaceName: string; // e.g. "命宫"
@@ -17,6 +18,7 @@ export interface FateCardProps {
   isActive?: boolean;
   layoutId?: string;
   id?: string;
+  onAskAI?: (question: string) => void;
 }
 
 export default function FateCard({
@@ -29,8 +31,20 @@ export default function FateCard({
   onClick,
   isActive,
   layoutId,
-  id
+  id,
+  onAskAI
 }: FateCardProps) {
+  // Logic: Find interpretation
+  const interpretation = React.useMemo(() => {
+    if (majorStars.length === 0) return null;
+    
+    // Try to find interpretation for the first major star
+    const starName = majorStars[0].name;
+    return STAR_INTERPRETATIONS.find(
+      item => item.star === starName && item.palace === palaceName
+    );
+  }, [majorStars, palaceName]);
+
   // If it's the grid variant, we use a simpler layout (similar to previous implementation but styled consistently)
   if (variant === "grid") {
     return (
@@ -114,7 +128,7 @@ export default function FateCard({
       </div>
 
       {/* Star Layout */}
-      <div className="relative h-full z-10">
+      <div className="relative h-full z-10 flex flex-col">
         {/* Palace Label - Vertical Right */}
         <div 
           className="absolute right-0 top-[10px] [writing-mode:vertical-rl] font-serif text-[24px] tracking-[8px] text-gold-primary"
@@ -123,20 +137,66 @@ export default function FateCard({
           {palaceName}
         </div>
 
-        {/* Major Star - Centered */}
-        <div className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2 text-center w-full">
+        {/* Center Content Area: Major Stars & Interpretation */}
+        <div className="flex-1 flex flex-col items-center justify-start pt-8 px-6 overflow-hidden">
+          {/* Major Star - Centered */}
           <div 
-            className="font-serif text-[42px] font-bold text-text-main tracking-[4px]"
+            className="font-serif text-[36px] font-bold text-text-main tracking-[4px] mb-4 shrink-0"
             style={{ textShadow: "0 4px 20px rgba(0,0,0,0.8)" }}
           >
             {majorStars.length > 0 ? (
               majorStars.map(s => s.name).join(" ")
             ) : "无主星"}
           </div>
+
+          {/* Interpretation Section */}
+          <div className="w-full flex flex-col items-center gap-4 overflow-y-auto [&::-webkit-scrollbar]:hidden pb-4">
+            {interpretation ? (
+              <div 
+                className="flex flex-col items-center gap-3 w-full cursor-pointer group"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onAskAI) {
+                     onAskAI(`请详细解释关于${palaceName}的这段描述：“${interpretation.summary}”。\n详细内容：${interpretation.detail}`);
+                  }
+                }}
+              >
+                 {/* Summary */}
+                 <div className="relative px-6 py-2 text-center">
+                    <span className="absolute top-0 left-0 text-gold-primary/40 font-serif text-2xl leading-none">❝</span>
+                    <p className="font-serif text-lg italic text-gold-primary group-hover:text-gold-light transition-colors duration-300">
+                      {interpretation.summary}
+                    </p>
+                    <span className="absolute bottom-0 right-0 text-gold-primary/40 font-serif text-2xl leading-none">❞</span>
+                 </div>
+
+                 <div className="w-16 h-px bg-liner-to-r from-transparent via-gold-primary/30 to-transparent shrink-0" />
+
+                 {/* Detail */}
+                 <p className="text-text-muted text-sm leading-relaxed text-justify font-sans opacity-90 px-1 group-hover:text-white/90 transition-colors duration-300">
+                    {interpretation.detail}
+                 </p>
+
+                 {/* Tags */}
+                 <div className="flex flex-wrap justify-center gap-2 mt-1">
+                    {interpretation.tags.map(tag => (
+                        <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-gold-light/60 group-hover:border-gold-primary/30 transition-colors">
+                            {tag}
+                        </span>
+                    ))}
+                 </div>
+              </div>
+            ) : (
+              <div className="text-white/30 text-sm italic mt-8 flex flex-col items-center gap-2">
+                <span className="text-2xl">✨</span>
+                星元流转，静待天机...
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Minor Stars - Bottom Grid */}
-        <div className="absolute bottom-[10px] left-0 w-full px-[10px] flex flex-wrap gap-2 text-[12px] text-text-muted justify-center">
+        <div className="w-full px-[10px] pb-[10px] flex flex-wrap gap-2 text-[12px] text-text-muted justify-center mt-auto">
           {minorStars.map((star, i) => (
             <span key={i} className="px-2 py-1 bg-white/5 rounded backdrop-blur-sm border border-white/5">
               {star.name}

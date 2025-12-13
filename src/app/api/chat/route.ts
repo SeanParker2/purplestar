@@ -86,6 +86,8 @@ function simplifyChartForAI(chart: any): string {
   }
 }
 
+export const maxDuration = 60; // Set max duration to 60 seconds (Pro plan can go higher)
+
 export async function POST(req: NextRequest) {
   try {
     // 0. Rate Limiting
