@@ -129,6 +129,42 @@ export default function AICopilot({ chart, palaceData, className, isOpen: extern
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  // Chart State Tracking
+  const prevChartRef = useRef<ZiWeiChart | null>(null);
+
+  // Check for chart changes
+  useEffect(() => {
+    // Skip initial render or if chart is null
+    if (!chart) return;
+
+    // Compare with previous chart
+    if (prevChartRef.current && 
+        (prevChartRef.current.solarDateStr !== chart.solarDateStr || 
+         prevChartRef.current.timeIndex !== chart.timeIndex ||
+         prevChartRef.current.gender !== chart.gender)) {
+      
+      // Chart has changed!
+      setMessages(prev => [
+        ...prev,
+        {
+          id: `system-reset-${Date.now()}`,
+          role: "assistant",
+          content: "检测到您的命盘已更新。是否需要为您重新分析当前的新命盘？",
+          timestamp: Date.now(),
+        }
+      ]);
+      
+      // If copilot is hidden, maybe show a notification dot? 
+      // For now, we just ensure the user sees the message if they open it.
+      if (!isOpen && !isControlled) {
+        // Optional: Auto-open or show badge
+      }
+    }
+
+    // Update ref
+    prevChartRef.current = chart;
+  }, [chart, isOpen, isControlled]);
+
   // Load Knowledge Base
   useEffect(() => {
     if (!palaceData) return;
@@ -272,7 +308,16 @@ export default function AICopilot({ chart, palaceData, className, isOpen: extern
       });
 
       if (!response.ok) {
-        throw new Error(`API Error: ${response.statusText}`);
+        let errorMsg = '连接异常';
+        try {
+          // Try to parse the error json from server
+          const errorData = await response.json();
+          errorMsg = errorData.error || response.statusText;
+        } catch (e) {
+          // If not json, use status text
+          errorMsg = response.statusText;
+        }
+        throw new Error(errorMsg);
       }
 
       // Prepare empty assistant message
@@ -331,7 +376,7 @@ export default function AICopilot({ chart, palaceData, className, isOpen: extern
         setMessages(prev => [...prev, {
           id: Date.now().toString(),
           role: 'assistant',
-          content: `[系统提示] 抱歉，推演过程中遇到问题：${error.message}`,
+          content: `[系统提示] 抱歉，${error.message}`,
           timestamp: Date.now()
         }]);
       }
