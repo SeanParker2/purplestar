@@ -36,9 +36,9 @@ export default function FateCard({
   onAskAI
 }: FateCardProps) {
   // Logic: Find interpretation
-  const { main, transformations, minors } = React.useMemo(() => 
-    getPalaceInterpretations(palaceName, majorStars, minorStars, adjectiveStars), 
-    [palaceName, majorStars, minorStars, adjectiveStars]
+  const { main, patterns, transformations, minors } = React.useMemo(() => 
+    getPalaceInterpretations(palaceName, majorStars, minorStars, adjectiveStars, stemBranch), 
+    [palaceName, majorStars, minorStars, adjectiveStars, stemBranch]
   );
 
   // If it's the grid variant, we use a simpler layout (similar to previous implementation but styled consistently)
@@ -155,6 +155,7 @@ export default function FateCard({
                   if (onAskAI) {
                      // 构建综合上下文
                      const context = [
+                        patterns.length > 0 ? `【特殊格局】${patterns.map(i => `${i.summary}: ${i.detail}`).join("；")}` : "",
                         `【主星格局】${main.map(i => `${i.summary}。${i.detail}`).join(" ")}`,
                         transformations.length > 0 ? `【四化变数】${transformations.map(i => `${i.star}${i.palace.replace("化", "")}: ${i.summary}`).join("；")}` : "",
                         minors.length > 0 ? `【辅星影响】${minors.map(i => `${i.star}: ${i.summary}`).join("；")}` : ""
@@ -164,6 +165,27 @@ export default function FateCard({
                   }
                 }}
               >
+                 {/* 新增：格局展示区 (Patterns) - 置顶显示 */}
+                 {patterns.length > 0 && (
+                   <div className="w-full flex flex-col gap-2 mb-4">
+                     {patterns.map((item, idx) => (
+                       <div key={`pat-${idx}`} className="relative p-3 rounded-lg border border-gold-primary/50 bg-gold-primary/10 flex flex-col gap-1">
+                          <div className="flex items-center gap-2">
+                             <span className="text-xs font-bold px-2 py-0.5 rounded bg-gold-primary text-void-bg">
+                               {item.star}
+                             </span>
+                             <span className="text-sm font-bold text-gold-light">
+                               {item.summary}
+                             </span>
+                          </div>
+                          <p className="text-xs opacity-90 leading-relaxed pl-1 text-justify">
+                            {item.detail}
+                          </p>
+                       </div>
+                     ))}
+                   </div>
+                 )}
+
                  {/* Section 1: 核心格局 (Main) */}
                  {main.map((item, idx) => (
                    <div key={`main-${idx}`} className="flex flex-col items-center gap-3 w-full">
