@@ -10,6 +10,13 @@ export type SolarDateStr = string; // YYYY-MM-DD
 export type TimeIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
 export type Gender = 'male' | 'female';
 
+export class ZiweiError extends Error {
+  constructor(message: string, public context?: any) {
+    super(message);
+    this.name = 'ZiweiError';
+  }
+}
+
 // Define output types
 export interface Star {
   name: string;
@@ -234,93 +241,143 @@ export class ZiWeiCalculator {
   }
 
   /**
-   * Helper to extract yearly palace data
+   * Helper to extract yearly palace data (Enhanced robustness version)
+   * @throws ZiweiError When data does not meet basic conditions
    */
   private static extractYearlyPalaces(astrolabe: FunctionalAstrolabe, horoscope: Horoscope): PalaceData[] {
-    const palaces: PalaceData[] = [];
-    const yearlyMutagens = horoscope.yearly.mutagen; // Array of star names [Lu, Quan, Ke, Ji]
-
-    for (let i = 0; i < 12; i++) {
-      // Use horoscope.palace(i) if available (user request), but iztro doesn't support it directly by index.
-      // We simulate it by accessing data by index which corresponds to the sector.
-      const p = astrolabe.palace(i);
-      if (!p) continue;
-
-      // 1. Yearly Palace Name
-      // Assuming horoscope.yearly.palaceNames is aligned with sectors 0..11
-      const yearlyName = horoscope.yearly.palaceNames[i];
-
-      // 2. Yearly Stars
-      // horoscope.yearly.stars[i] is array of stars for this sector
-      const yearlyStars = horoscope.yearly.stars?.[i] || [];
-      
-      const mappedYearlyStars: Star[] = yearlyStars.map((s: any) => ({
-        name: s.name,
-        mutagen: s.mutagen, 
-        brightness: s.brightness
-      }));
-
-      // 3. Yearly Transformations
-      // Check if any major star in the sector matches the yearly mutagen
-      const updatedMajorStars = p.majorStars.map(s => {
-        let mutagen = '';
-        const mIndex = yearlyMutagens.indexOf(s.name);
-        if (mIndex === 0) mutagen = '禄';
-        else if (mIndex === 1) mutagen = '权';
-        else if (mIndex === 2) mutagen = '科';
-        else if (mIndex === 3) mutagen = '忌';
-        
-        return {
-          name: s.name,
-          mutagen: mutagen || undefined, // Prioritize yearly mutagen
-          brightness: s.brightness
-        };
-      });
-
-      // Also check minor stars for transformations
-      const updatedMinorStars = p.minorStars.map(s => {
-         let mutagen = '';
-         const mIndex = yearlyMutagens.indexOf(s.name);
-         if (mIndex === 0) mutagen = '禄';
-         else if (mIndex === 1) mutagen = '权';
-         else if (mIndex === 2) mutagen = '科';
-         else if (mIndex === 3) mutagen = '忌';
-         return { ...s, mutagen: mutagen || undefined };
-      });
-
-      // 4. Jiang Qian 12 Stars (and Sui Qian 12 Stars)
-      const extraStars: Star[] = [];
-      // Access safe properties
-      const yearlyDecStar = (horoscope.yearly as any).yearlyDecStar;
-      
-      if (yearlyDecStar) {
-        if (yearlyDecStar.jiangqian12 && yearlyDecStar.jiangqian12[i]) {
-            extraStars.push({ name: yearlyDecStar.jiangqian12[i] });
-        }
-        if (yearlyDecStar.suiqian12 && yearlyDecStar.suiqian12[i]) {
-            extraStars.push({ name: yearlyDecStar.suiqian12[i] });
-        }
+    try {
+      // Defensive check for critical data
+      if (!horoscope?.yearly) {
+        throw new ZiweiError('流年数据缺失', { horoscope });
       }
 
-      const allMiscStars = [
-         ...p.adjectiveStars.map(s => ({ name: s.name, mutagen: s.mutagen, brightness: s.brightness })),
-         ...mappedYearlyStars,
-         ...extraStars
-      ];
+      const palaces: PalaceData[] = [];
+      const yearlyMutagens = horoscope.yearly.mutagen; // Array of star names [Lu, Quan, Ke, Ji]
 
-      palaces.push({
-        palaceName: yearlyName,
-        stem: p.heavenlyStem,
-        branch: p.earthlyBranch,
-        heavenlyEarthly: p.heavenlyStem + p.earthlyBranch,
-        majorStars: updatedMajorStars,
-        minorStars: updatedMinorStars,
-        miscStars: allMiscStars,
-        transformations: updatedMajorStars.map(s => s.mutagen).filter(Boolean) as string[],
-        isYearly: true,
-      });
+      // 1. Validate Yearly Stars Length
+      // Use explicit type assertion for robustness logic as requested, although we just check length here.
+      const yearlyStarsArray = horoscope.yearly.stars;
+      
+      // Runtime validation for array length
+      if (!Array.isArray(yearlyStarsArray) || yearlyStarsArray.length !== 12) {
+         throw new ZiweiError('流年星曜数据不完整', { length: yearlyStarsArray?.length });
+      }
+
+      // Prioritize API: astrolabe.horoscope(date).yearly.palaceNames
+      const palaceNames = horoscope.yearly.palaceNames;
+      if (!Array.isArray(palaceNames) || palaceNames.length !== 12) {
+         throw new ZiweiError('流年宫位名称数据不完整', { length: palaceNames?.length });
+      }
+
+      for (let i = 0; i < 12; i++) {
+        // Defensive access to astrolabe palace
+        const p = astrolabe.palace(i);
+        if (!p) continue;
+
+        // 1. Yearly Palace Name
+        const yearlyName = palaceNames[i];
+        if (!yearlyName) {
+            // Should be covered by length check but double check
+             throw new ZiweiError(`第${i}宫流年宫位名缺失`);
+        }
+
+        // 2. Yearly Stars
+        // Defensive access with optional chaining
+        const sectorStars = yearlyStarsArray?.[i]; 
+        
+        // Map to our Star interface
+        const mappedYearlyStars: Star[] = Array.isArray(sectorStars) 
+            ? sectorStars.map((s: any) => ({
+                name: s?.name || '未知',
+                mutagen: s?.mutagen,
+                brightness: s?.brightness
+              }))
+            : [];
+
+        // 3. Yearly Transformations
+        // Strict mutagen matching with optional chaining
+        const updatedMajorStars = p.majorStars.map(s => {
+            // Defensive check for star name
+            if (!s?.name) return { name: '未知' };
+
+            let mutagen = '';
+            // find index in yearlyMutagens
+            if (yearlyMutagens && Array.isArray(yearlyMutagens)) {
+                // Strict validation: check mName existence and match
+                const mIndex = yearlyMutagens.findIndex(mName => mName && s.name && mName === s.name);
+                
+                if (mIndex === 0) mutagen = '禄';
+                else if (mIndex === 1) mutagen = '权';
+                else if (mIndex === 2) mutagen = '科';
+                else if (mIndex === 3) mutagen = '忌';
+            }
+            
+            return {
+                name: s.name,
+                mutagen: mutagen || undefined,
+                brightness: s.brightness
+            };
+        });
+
+        // Also check minor stars for transformations
+        const updatedMinorStars = p.minorStars.map(s => {
+             if (!s?.name) return { name: '未知' };
+             
+             let mutagen = '';
+             if (yearlyMutagens && Array.isArray(yearlyMutagens)) {
+                const mIndex = yearlyMutagens.findIndex(mName => mName && s.name && mName === s.name);
+                
+                if (mIndex === 0) mutagen = '禄';
+                else if (mIndex === 1) mutagen = '权';
+                else if (mIndex === 2) mutagen = '科';
+                else if (mIndex === 3) mutagen = '忌';
+             }
+             return { ...s, mutagen: mutagen || undefined };
+        });
+
+        // 4. Jiang Qian 12 Stars (and Sui Qian 12 Stars)
+        const extraStars: Star[] = [];
+        // Access safe properties with optional chaining
+        const yearlyDecStar = (horoscope.yearly as any)?.yearlyDecStar;
+        
+        if (yearlyDecStar) {
+            if (yearlyDecStar?.jiangqian12?.[i]) {
+                extraStars.push({ name: yearlyDecStar.jiangqian12[i] });
+            }
+            if (yearlyDecStar?.suiqian12?.[i]) {
+                extraStars.push({ name: yearlyDecStar.suiqian12[i] });
+            }
+        }
+
+        const allMiscStars = [
+             ...p.adjectiveStars.map(s => ({ name: s?.name, mutagen: s?.mutagen, brightness: s?.brightness })),
+             ...mappedYearlyStars,
+             ...extraStars
+        ];
+
+        palaces.push({
+            palaceName: yearlyName,
+            stem: p.heavenlyStem,
+            branch: p.earthlyBranch,
+            heavenlyEarthly: (p.heavenlyStem || '') + (p.earthlyBranch || ''),
+            majorStars: updatedMajorStars,
+            minorStars: updatedMinorStars,
+            miscStars: allMiscStars,
+            transformations: updatedMajorStars.map(s => s.mutagen).filter(Boolean) as string[],
+            isYearly: true,
+        });
+      }
+
+      return palaces;
+
+    } catch (error) {
+        // If already a ZiweiError, rethrow
+        if (error instanceof ZiweiError) {
+            throw error;
+        }
+        // Log detailed error and wrap in ZiweiError
+        console.error('extractYearlyPalaces failed:', error);
+        throw new ZiweiError('流年排盘计算失败', { originalError: error });
     }
-
-    return palaces;
   }
 }

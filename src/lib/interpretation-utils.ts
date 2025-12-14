@@ -1,15 +1,55 @@
 import { STAR_INTERPRETATIONS, type StarInterpretation } from "@/data/interpretations";
 import { type Star } from "@/lib/ziwei";
 
+// ==================== Optimization: Global Index Map ====================
+
+// Key format: `${starName}_${palaceName}`
+const INTERPRETATION_MAP = new Map<string, StarInterpretation>();
+
+// Initialize the map immediately
+(function initializeMap() {
+  STAR_INTERPRETATIONS.forEach(item => {
+    // 1. Add direct mapping
+    const key = `${item.star}_${item.palace}`;
+    INTERPRETATION_MAP.set(key, item);
+
+    // 2. Handle dual star combinations (e.g., "紫微,贪狼")
+    // This allows looking up "贪狼,紫微" and getting the same result
+    if (item.star.includes(',')) {
+      const parts = item.star.split(',');
+      if (parts.length === 2) {
+        // Add the reverse combination as well
+        const reverseKey = `${parts[1]},${parts[0]}_${item.palace}`;
+        // Only set if not already present (avoid overwriting if explicit entry exists)
+        if (!INTERPRETATION_MAP.has(reverseKey)) {
+          INTERPRETATION_MAP.set(reverseKey, item);
+        }
+      }
+    }
+  });
+})();
+
+/**
+ * Helper: Find interpretation using O(1) Map lookup
+ * @param starName The name of the star (or comma-separated combination)
+ * @param palaceName The name of the palace
+ * @returns The matching StarInterpretation or undefined
+ */
+function findInterpretation(starName: string, palaceName: string): StarInterpretation | undefined {
+  return INTERPRETATION_MAP.get(`${starName}_${palaceName}`);
+}
+
 export interface PalaceInterpretations {
   main: StarInterpretation[];      
-  patterns: StarInterpretation[]; // 新增：格局解释
+  patterns: StarInterpretation[]; // 格局解释
   transformations: StarInterpretation[];
   minors: StarInterpretation[];    
 }
 
 /**
  * 智能解盘算法：根据星曜组合、四化、格局进行多维度匹配
+ * 
+ * Optimized: Uses Hash Map for O(1) lookups instead of linear search.
  */
 export function getPalaceInterpretations(
   palaceName: string,
@@ -68,7 +108,7 @@ export function getPalaceInterpretations(
 
   // 辅助函数：查找并添加格局断语
   function addPattern(name: string) {
-    const interp = STAR_INTERPRETATIONS.find(item => item.star === name && item.palace === "格局");
+    const interp = findInterpretation(name, "格局");
     if (interp) result.patterns.push(interp);
   }
 
@@ -77,34 +117,29 @@ export function getPalaceInterpretations(
   if (majorStars.length === 2) {
     const s1 = majorStars[0].name;
     const s2 = majorStars[1].name;
-    const combinations = [`${s1},${s2}`, `${s2},${s1}`];
     
-    for (const combo of combinations) {
-      const dualInterp = STAR_INTERPRETATIONS.find(
-        item => item.star === combo && item.palace === palaceName
-      );
-      if (dualInterp) {
-        // 如果是借星，添加标记
-        if (isBorrowed) {
-          result.main.push({
-            ...dualInterp,
-            summary: `(借星) ${dualInterp.summary}`,
-            tags: [...dualInterp.tags, "#借星"]
-          });
-        } else {
-          result.main.push(dualInterp);
-        }
-        foundDual = true;
-        break;
+    // Construct key directly. The Map handles "A,B" and "B,A" cases automatically.
+    const comboName = `${s1},${s2}`;
+    const dualInterp = findInterpretation(comboName, palaceName);
+    
+    if (dualInterp) {
+      // 如果是借星，添加标记
+      if (isBorrowed) {
+        result.main.push({
+          ...dualInterp,
+          summary: `(借星) ${dualInterp.summary}`,
+          tags: [...dualInterp.tags, "#借星"]
+        });
+      } else {
+        result.main.push(dualInterp);
       }
+      foundDual = true;
     }
   }
 
   if (!foundDual) {
     majorStars.forEach(star => {
-      const interp = STAR_INTERPRETATIONS.find(
-        item => item.star === star.name && item.palace === palaceName
-      );
+      const interp = findInterpretation(star.name, palaceName);
       if (interp) {
         // 如果是借星，添加标记
         if (isBorrowed) {
@@ -125,9 +160,7 @@ export function getPalaceInterpretations(
   allStarsForTransform.forEach(star => {
     if (star.mutagen) {
       const searchPalace = "化" + star.mutagen; 
-      const interp = STAR_INTERPRETATIONS.find(
-        item => item.star === star.name && item.palace === searchPalace
-      );
+      const interp = findInterpretation(star.name, searchPalace);
       if (interp) result.transformations.push(interp);
     }
   });
@@ -135,9 +168,7 @@ export function getPalaceInterpretations(
   // ==================== Step C: 辅星/杂曜 (Minor/Adjective Stars) ====================
   const miscStars = [...minorStars, ...adjectiveStars];
   miscStars.forEach(star => {
-    const interp = STAR_INTERPRETATIONS.find(
-      item => item.star === star.name && item.palace === palaceName
-    );
+    const interp = findInterpretation(star.name, palaceName);
     if (interp) result.minors.push(interp);
   });
 

@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Sparkles, Minimize2, X, Bot, BookOpen, StopCircle, Maximize2, MessageCircle } from "lucide-react";
+import { Send, Sparkles, Minimize2, X, Bot, BookOpen, StopCircle, Maximize2, MessageCircle, Trash2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
 import { type PalaceData, type ZiWeiChart } from "@/lib/ziwei";
@@ -10,9 +10,16 @@ import { STAR_INTERPRETATIONS, type StarInterpretation } from "@/data/interpreta
 
 // --- Types ---
 
+interface StoredMessage {
+  id: string;
+  content: string;
+  role: 'user' | 'assistant' | 'system';
+  timestamp: number;
+}
+
 interface Message {
   id: string;
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "system";
   content: string;
   timestamp: number;
   action?: {
@@ -123,6 +130,98 @@ export default function AICopilot({ chart, palaceData, className, isOpen: extern
       timestamp: Date.now(),
     },
   ]);
+
+  // --- Local Storage Logic ---
+  
+  // Load History
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("chat_history");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Validate and restore
+          // We assume stored messages are valid StoredMessage, map to Message
+          // We need to ensure we don't break if action is missing (it's optional in Message)
+          const restoredMessages: Message[] = parsed.map((m: any) => ({
+            id: m.id || Date.now().toString(),
+            role: m.role || "assistant",
+            content: m.content || "",
+            timestamp: m.timestamp || Date.now(),
+            action: m.action // Optional
+          }));
+          setMessages(restoredMessages);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load chat history:", e);
+      // If corrupted, clear it
+      localStorage.removeItem("chat_history");
+    }
+  }, []);
+
+  // Auto-save with debounce
+  useEffect(() => {
+    const saveToStorage = setTimeout(() => {
+      try {
+        // Filter out system messages and init message for storage? 
+        // User said: "为系统消息添加特殊标记避免存储" (Add special flag to system messages to avoid storage)
+        // We will filter out 'system' role. 
+        // We also probably want to keep 'init' if it's the only one, or just store user/assistant conversation.
+        // Let's store everything except 'system'.
+        const messagesToSave = messages.filter(m => m.role !== 'system').map(m => ({
+          id: m.id,
+          content: m.content,
+          role: m.role,
+          timestamp: m.timestamp,
+          action: m.action
+        }));
+
+        if (messagesToSave.length > 0) {
+          const jsonString = JSON.stringify(messagesToSave);
+          // Check size (approximate)
+          if (jsonString.length > 50000) { // ~50KB limit
+             // If too large, keep only last 20 messages + init?
+             // Simple strategy: trim from beginning, keep init if present
+             const trimmed = [
+               ...messagesToSave.slice(0, 1), // Keep first (init)
+               ...messagesToSave.slice(-20)   // Keep last 20
+             ];
+             localStorage.setItem("chat_history", JSON.stringify(trimmed));
+          } else {
+             localStorage.setItem("chat_history", jsonString);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to save chat history:", e);
+        // Handle QuotaExceededError
+        if (e instanceof DOMException && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED')) {
+           // Clear old history or notify user? 
+           // For now, just try to trim aggressively
+           try {
+             const trimmed = messages.slice(-10).filter(m => m.role !== 'system');
+             localStorage.setItem("chat_history", JSON.stringify(trimmed));
+           } catch (retryError) {
+             console.error("Still failed to save after trim:", retryError);
+           }
+        }
+      }
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(saveToStorage);
+  }, [messages]);
+
+  const handleClearHistory = () => {
+    if (window.confirm("确定要清空所有对话历史吗？")) {
+      localStorage.removeItem("chat_history");
+      setMessages([{
+        id: "init",
+        role: "assistant",
+        content: "你好，我是你的紫微斗数 AI 助手。我可以为你解读命盘，分析运势。点击“分析此宫”开始吧。",
+        timestamp: Date.now(),
+      }]);
+    }
+  };
   
   // Knowledge Base State
   const [interpretation, setInterpretation] = useState<StarInterpretation | null>(null);
@@ -149,7 +248,7 @@ export default function AICopilot({ chart, palaceData, className, isOpen: extern
           ...prev,
           {
             id: `system-switch-${Date.now()}`,
-            role: "assistant",
+            role: "system",
             content: `检测到您已切换至 ${palaceData.palaceName}。`,
             timestamp: Date.now(),
             action: {
@@ -179,11 +278,11 @@ export default function AICopilot({ chart, palaceData, className, isOpen: extern
       setMessages(prev => [
         ...prev,
         {
-          id: `system-reset-${Date.now()}`,
-          role: "assistant",
-          content: "检测到您的命盘已更新。是否需要为您重新分析当前的新命盘？",
-          timestamp: Date.now(),
-        }
+            id: `system-reset-${Date.now()}`,
+            role: "system",
+            content: "检测到您的命盘已更新。是否需要为您重新分析当前的新命盘？",
+            timestamp: Date.now(),
+          }
       ]);
       
       // If copilot is hidden, maybe show a notification dot? 
@@ -304,24 +403,22 @@ export default function AICopilot({ chart, palaceData, className, isOpen: extern
       additionalContext = `\n\n相关断语参考（用户宫位：${palaceData.palaceName}，主星：${safeStarName}）：${safeSummary}`;
     }
 
-    // Construct Chart Context
+    // Construct Chart Context - Simplified to current palace only
+    // User request: "单独就现星曜进行分析" (Analyze only current star/palace)
+    // We restructure this to match what simplifyChartData expects (chart-like object with single palace)
     const chartContext = {
-      palace: palaceData,
-      basicInfo: chart ? {
-        gender: chart.gender,
-        solarDate: chart.solarDateStr,
-        timeIndex: chart.timeIndex
-      } : null,
-      knowledgeBase: additionalContext
+      gender: chart?.gender,
+      fiveElements: chart?.fiveElements,
+      lifeOwner: chart?.lifeOwner,
+      bodyOwner: chart?.bodyOwner,
+      palaces: [palaceData], // Only pass the current palace data
     };
 
-    // Filter history (exclude init message)
-    const history = messages
-      .filter(m => m.id !== 'init')
-      .map(m => ({ role: m.role, content: m.content }));
+    // Filter history
+    // User request: "不需要传上下文" (No need to pass context/history)
+    // We send an empty history to ensure the analysis is focused solely on the current question and palace.
+    const history: Message[] = [];
     
-    const apiMessages = [...history, { role: 'user', content: text + additionalContext }];
-
     // API Call
     abortControllerRef.current = new AbortController();
 
@@ -333,7 +430,8 @@ export default function AICopilot({ chart, palaceData, className, isOpen: extern
           'Accept': 'text/event-stream',
         },
         body: JSON.stringify({
-          messages: apiMessages,
+          history: history,
+          currentQuestion: text + additionalContext,
           chartContext: chartContext
         }),
         signal: abortControllerRef.current.signal,
@@ -490,6 +588,13 @@ export default function AICopilot({ chart, palaceData, className, isOpen: extern
               <span className="font-serif font-medium tracking-wide">PurpleStar AI 问策</span>
             </div>
             <div className="flex items-center gap-1">
+              <button
+                onClick={handleClearHistory}
+                className="p-1.5 rounded-lg text-white/50 hover:text-red-400 hover:bg-white/10 transition-colors"
+                title="清空历史"
+              >
+                <Trash2 size={16} />
+              </button>
               <button
                 onClick={() => setIsMinimized(true)}
                 className="p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors"

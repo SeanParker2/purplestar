@@ -8,7 +8,8 @@ import {
   ChevronLeft, 
   ChevronRight,
   Sparkles,
-  RotateCcw
+  RotateCcw,
+  FileText
 } from "lucide-react";
 
 // Components
@@ -18,6 +19,7 @@ import InputPortal from "@/components/InputPortal";
 import FateCard from "@/components/cards/FateCard";
 import FullBoard from "@/components/charts/FullBoard";
 import AICopilot from "@/components/ai/AICopilot";
+import ReportGenerator from "@/components/modals/ReportGenerator";
 import FlyingStarOverlay from "@/components/effects/FlyingStarOverlay";
 
 // Logic & Utils
@@ -53,6 +55,7 @@ export default function Home() {
   const [chart, setChart] = useState<ZiWeiChart | null>(null);
   const [activeIndex, setActiveIndex] = useState<number>(0);
   const [showAI, setShowAI] = useState(false);
+  const [showReport, setShowReport] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   // Hydration fix & Persistence
@@ -116,6 +119,14 @@ export default function Home() {
   };
 
   const handleInputSubmit = (data: { date: Date; longitude: number; gender: "male" | "female" }) => {
+    // Reset AI Chat History immediately to ensure context consistency for new chart
+    try {
+      localStorage.removeItem('chat_history');
+      localStorage.removeItem('report_cache');
+    } catch (e) {
+      console.error("Failed to clear history:", e);
+    }
+
     try {
       // Calculate True Solar Time
       const trueTime = calculateTrueSolarTime(data.date, data.longitude);
@@ -160,6 +171,8 @@ export default function Home() {
   const handleReset = () => {
     if (confirm("确定要重新排盘吗？当前数据将清除。")) {
       localStorage.removeItem('ziwei_user_data');
+      localStorage.removeItem('chat_history');
+      localStorage.removeItem('report_cache');
       setChart(null);
       setUserData(null);
       setView('home');
@@ -335,6 +348,7 @@ export default function Home() {
                  currentMode={chartMode}
                  onModeChange={setChartMode}
                  onAskAI={() => setShowAI(true)}
+                 onGenerateReport={() => setShowReport(true)}
                />
             </div>
 
@@ -346,6 +360,14 @@ export default function Home() {
                 isOpen={true}
                 onClose={() => setShowAI(false)}
                 className="z-60"
+              />
+            )}
+
+            {/* Level 6: Report Generator Modal */}
+            {showReport && (
+              <ReportGenerator 
+                chartContext={chart}
+                onClose={() => setShowReport(false)}
               />
             )}
 
@@ -362,9 +384,10 @@ interface BottomNavBarProps {
   currentMode: ChartMode;
   onModeChange: (mode: ChartMode) => void;
   onAskAI: () => void;
+  onGenerateReport: () => void;
 }
 
-function BottomNavBar({ currentMode, onModeChange, onAskAI }: BottomNavBarProps) {
+function BottomNavBar({ currentMode, onModeChange, onAskAI, onGenerateReport }: BottomNavBarProps) {
   const navItems = [
     { 
       id: 'focus', 
@@ -386,11 +409,18 @@ function BottomNavBar({ currentMode, onModeChange, onAskAI }: BottomNavBarProps)
       icon: Sparkles, 
       active: false,
       onClick: onAskAI
+    },
+    { 
+      id: 'report', 
+      label: '报告', 
+      icon: FileText, 
+      active: false,
+      onClick: onGenerateReport
     }
   ];
 
   return (
-    <div className="relative w-full max-w-[320px] mx-auto h-[64px] rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-lg flex items-center justify-around px-2">
+    <div className="relative w-full max-w-[360px] mx-auto h-[64px] rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-lg flex items-center justify-around px-2">
       {navItems.map((item) => (
         <button
           key={item.id}

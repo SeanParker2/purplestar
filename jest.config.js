@@ -12,7 +12,13 @@ const customJestConfig = {
   testEnvironment: 'jest-environment-jsdom',
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
-  }
+    // Force module resolution for ESM-only packages
+    '^react-markdown$': '<rootDir>/src/__mocks__/react-markdown.js',
+  },
+  transformIgnorePatterns: [
+    // Transform ESM-only packages
+    'node_modules/(?!(react-markdown|vfile|vfile-message|unist-.*|unified|bail|is-plain-obj|trough|remark-.*|mdast-util-.*|micromark.*|decode-named-character-reference|character-entities|property-information|hast-util-whitespace|space-separated-tokens|comma-separated-tokens|pretty-bytes|ccount|escapes|trim-lines)/)',
+  ]
 }
 
 // createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async
